@@ -1,0 +1,24 @@
+{
+  "name": "agents-progress",
+  "version": "1.0.0",
+  "description": "Progress bar above the prompt for delegated work, plus an agents panel (/agents-info) that opens for any subagent: running, finished and planned subagents with model, task progress, context, cost and time.",
+  "author": {
+    "name": "Fabio Barbieri"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "language": {
+      "type": "string",
+      "title": "Panel language",
+      "description": "auto follows Claude Code's language setting, then the system locale",
+      "default": "auto",
+      "options": [
+        "auto",
+        "en",
+        "pt",
+        "ru"
+      ]
+    }
+  },
+  "license": "MIT"
+}

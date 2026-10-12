@@ -1,0 +1,13 @@
+{
+  "name": "agents-progress-local",
+  "description": "Local marketplace for the agents-progress mod.",
+  "owner": {
+    "name": "Fabio Barbieri"
+  },
+  "plugins": [
+    {
+      "name": "agents-progress",
+      "source": "./"
+    }
+  ]
+}
