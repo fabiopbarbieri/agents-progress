@@ -3,8 +3,11 @@
   "version": "1.0.0",
   "description": "Progress bar above the prompt for delegated work, plus an agents panel (/agents-info) that opens for any subagent: running, finished and planned subagents with model, task progress, context, cost and time.",
   "author": {
-    "name": "Fabio Barbieri"
+    "name": "Fabio Barbieri",
+    "url": "https://github.com/fabiopbarbieri"
   },
+  "homepage": "https://github.com/fabiopbarbieri/agents-progress",
+  "repository": "https://github.com/fabiopbarbieri/agents-progress",
   "types": "./types/index.d.ts",
   "userConfig": {
     "language": {

@@ -1,6 +1,6 @@
 # agents-progress
 
-A local Claude Code mod, forked from [savvy-progress](https://github.com/johnnyvizz/claude-kit/tree/main/plugins/savvy-progress) (MIT): a progress bar above the prompt and a live panel of subagents.
+A Claude Code mod, forked from [savvy-progress](https://github.com/johnnyvizz/claude-kit/tree/main/plugins/savvy-progress) (MIT): a progress bar above the prompt and a live panel of subagents.
 
 - **Agents panel** (`/agents-info` toggles it): opens by itself when any subagent starts, once per busy spell (a run started while none was running) or once per reported flow, so closing it sticks until then. Shows running, the latest ten finished and planned subagents with model, effort, task progress, context, estimated cost and time; the totals count every run.
 - **Progress bar**: the flow's title, phase, accepted tasks out of planned, and a button with the crew size that opens the panel. It appears once something calls `progress`, sits under any other plugin's band, and steps aside 10 seconds after the flow is reported finished.
@@ -18,14 +18,14 @@ Cost is a rough estimate from token counts and the `PRICES` table in `hooks/regi
 
 `language`: `auto` (default), `en`, `pt` or `ru`. Set it in `/config`.
 
-## Install (local)
+## Install
 
 ```bash
-claude plugin marketplace add /path/to/agents-progress
+claude plugin marketplace add fabiopbarbieri/agents-progress
 claude plugin install agents-progress@agents-progress-local
 ```
 
-The marketplace is this folder and the entry's source is relative, so the session reads the plugin from here: edit, then `/reload-plugins`.
+To work on it, add your clone as the marketplace instead (`claude plugin marketplace add <path to the clone>`): the entry's source is relative, so the session reads the plugin from that folder. Edit, then `/reload-plugins`.
 
 ## Checks
 
