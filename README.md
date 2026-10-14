@@ -41,3 +41,13 @@ npx -p typescript@5 tsc -p .
 `claude plugin test` runs `tests/*.test.ts` against the engine's own host, on the terminal and desktop surfaces; `tests/kit.ts` stands for the engine beneath the mod. It checks the hooks and the trees they return, not how a surface paints them.
 
 `tsc` reads the API types the engine lays in `.claude-plugin/types/` (ignored by Git) when an interactive session loads the mod from its folder, as `claude --plugin-dir .` does; a `claude -p` run does not lay them. Tests stay out of it, as their fixtures are partial.
+
+## Versioning
+
+[Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html), with `version` in `.claude-plugin/plugin.json` as the one source:
+
+- **Major**: a change that breaks what others rely on: the tools' inputs or answers, the `$.state` contract in `types/index.d.ts`, a `userConfig` option removed or renamed, the `/agents-info` command.
+- **Minor**: a feature that keeps all of that working.
+- **Patch**: a fix, a performance gain or a docs change.
+
+To release: move `version`, add its section to `CHANGELOG.md`, commit, then `claude plugin tag . --push` (tag `agents-progress--v<version>`) and a GitHub release from that section.
