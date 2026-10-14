@@ -205,6 +205,16 @@ const merge = (prev: Flow | null, input: ProgressInput): Flow => {
   }
 }
 
+// What every subagent's brief gets, so the pane draws the task's own bar instead of
+// its context fill. In English, as the tools' own descriptions are.
+const STEP_BRIEF =
+  'Report your progress with `mcp__agents-progress__step` (if it is listed only by name, load it first with ' +
+  'ToolSearch `select:mcp__agents-progress__step`): right after reading this brief, call it with `total` (your plan ' +
+  'in 3 to 8 steps) and `done: 0`; call it again with the new `done` and a short `note` as each step finishes.'
+
+const briefed = (prompt: string, isOn: boolean): string =>
+  !isOn || prompt.includes(STEP_TOOL) ? prompt : `${prompt}\n\n${STEP_BRIEF}`
+
 // Runs still at work. The Agent tool answers as soon as a background run starts,
 // so only the runs' own status says how many are out.
 const runningOf = (list: AgentRun[]): number => list.filter(a => a.status === 'running').length
@@ -884,7 +894,7 @@ export const register: Register = (on, options) => {
   })
 
   on('agent.spawn', async ($, e, next) => {
-    const started = await next(e)
+    const started = await next({ ...e, prompt: briefed(e.prompt, options.stepBrief !== 'off') })
     if (started.deny !== undefined) return started
 
     const at = await $.clock.now()

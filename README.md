@@ -9,14 +9,17 @@ A Claude Code mod, forked from [savvy-progress](https://github.com/johnnyvizz/cl
 ## Tools and skill
 
 - `mcp__agents-progress__progress`: the delegating session reports the plan, phase and accepted tasks.
-- `mcp__agents-progress__step`: a subagent reports its own steps (`done`, `total`, `note`). One that does not report shows its context fill in grey.
+- `mcp__agents-progress__step`: a subagent reports its own steps (`done`, `total`, `note`). The mod adds a paragraph asking for it to every subagent's prompt; a run that does not report shows its context fill in grey.
 - Skill `agents-progress:reportar-progresso`: when and how to call both.
 
 Cost is a rough estimate from token counts and the `PRICES` table in `hooks/register.tsx`, not a bill.
 
 ## Settings
 
-`language`: `auto` (default), `en`, `pt` or `ru`. Set it in `/config`.
+Set them in `/config`.
+
+- `language`: `auto` (default), `en`, `pt` or `ru`.
+- `stepBrief`: `on` (default) briefs every subagent to report its steps; `off` leaves prompts as written. Each report is one more model request in the subagent.
 
 ## Install
 
