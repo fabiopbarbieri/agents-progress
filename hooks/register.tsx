@@ -1097,7 +1097,8 @@ export const register: Register = (on, options) => {
       />
     )
 
-    if ('Svg' in ui) {
+    // The terminal's table has no Svg, though its resolve answers the name: ask the surface.
+    if (e.surface !== 'terminal' && 'Svg' in ui) {
       const { Svg } = ui
       // About 8 CSS px per reported column; the rest is the count, the dismiss
       // and their gaps. No floor above the slot: a row wider than it would wrap.
