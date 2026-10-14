@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, RenderElement } from 'claude-code'
 
 import type { AgentRun, Flow, Panel, Phase, PlannedTask } from '../types'
 
@@ -16,6 +16,8 @@ const TOOL = 'mcp__agents-progress__progress'
 const STEP_TOOL = 'mcp__agents-progress__step'
 const PANE = 'agents-progress'
 const PHASES: readonly Phase[] = ['plan', 'design', 'delegate', 'review', 'close']
+// How long a finished flow's band stays before it steps aside by itself.
+const FINISHED_LINGER_MS = 10_000
 const ACCENT = '#8f8cf4'
 const DONE = '#5fbf8f'
 
@@ -688,10 +690,29 @@ async function autoOpen($: EngineInterface, key: string): Promise<void> {
   void $.ui.open({ id: PANE, title: tr().pane })
 }
 
+// A finished flow leaves the band after FINISHED_LINGER_MS, unless a newer one took its place.
+function stepAside($: EngineInterface, f: Flow): void {
+  const finishedAt = f.finishedAt
+  if (finishedAt === undefined) return
+  void (async () => {
+    const wait = Math.max(0, finishedAt + FINISHED_LINGER_MS - (await $.clock.now()))
+    $.clock.after(wait, () => {
+      void update($, flow, prev => (prev?.isFinished && prev.finishedAt === finishedAt ? null : prev))
+    })
+  })()
+}
+
+// What core draws when no plugin has a band to show.
+const isBlank = (el: RenderElement | undefined): boolean =>
+  !el || ((el.type === 'Box' || (el.type as string) === 'Fragment') && (el.children ?? []).length === 0)
+
 export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     lang = await detectLang($, options.language)
+    // A reload drops pending timers: a finished flow held by the host still steps aside.
+    const held = await read($, flow)
+    if (held?.isFinished) stepAside($, held)
     await $.tool.register({
       name: 'progress',
       description:
@@ -772,7 +793,12 @@ export const register: Register = (on, options) => {
       // A new flow starts with a clean list; agents still running stay.
       await update($, agents, list => list.filter(a => a.status === 'running'))
     }
-    const next = await update($, flow, p => merge(p, input))
+    const at = await $.clock.now()
+    const next = await update($, flow, p => {
+      const merged = merge(p, input)
+      return merged.isFinished ? { ...merged, finishedAt: at } : merged
+    })
+    if (next?.isFinished) stepAside($, next)
     if (next && input.tasks?.length) await autoOpen($, next.title)
     return { result: `ok: ${label(next ?? blank(), runningOf(await read($, agents)))}` }
   })
@@ -1063,8 +1089,9 @@ export const register: Register = (on, options) => {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const below = await next(e)
     const f = await read($, flow)
-    if (f === null || e.props.hasSurvey) return next(e)
+    if (f === null || e.props.hasSurvey) return below
 
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
@@ -1085,25 +1112,34 @@ export const register: Register = (on, options) => {
       />
     )
 
+    // Another plugin's band stays, with this one under it.
+    const stack = (mine: RenderElement): RenderElement =>
+      isBlank(below) ? mine : (
+        <Box flexDirection="column">
+          {below}
+          {mine}
+        </Box>
+      )
+
     // The terminal's table has no Svg, though its resolve answers the name: ask the surface.
     if (e.surface !== 'terminal' && 'Svg' in ui) {
       const { Svg } = ui
       // About 8 CSS px per reported column; the rest is the count, the dismiss
       // and their gaps. No floor above the slot: a row wider than it would wrap.
       const width = Math.max(180, Math.min(1600, (e.props.bodyColumns || 100) * 8 - 96))
-      return (
+      return stack(
         <Box flexDirection="row" alignItems="center" gap={1}>
           <Svg source={rowSvg(f, width, running)} alt={`${f.title}: ${label(f, running)}, ${percent}`} width={width} height={H} />
           {crewButton}
           {dismiss}
-        </Box>
+        </Box>,
       )
     }
 
     const cols = e.props.bodyColumns
     const titleW = Math.max(8, Math.min(30, f.title.length + 2, Math.floor(cols / 3)))
     const width = Math.max(6, Math.min(40, cols - titleW - 32))
-    return (
+    return stack(
       <Box flexDirection="row" gap={2}>
         <Box width={titleW} flexShrink={0}>
           <Text color={f.isFinished ? DONE : ACCENT}>● </Text>
@@ -1115,7 +1151,7 @@ export const register: Register = (on, options) => {
         <Text color={CLAY}>▣</Text>
         {crewButton}
         {dismiss}
-      </Box>
+      </Box>,
     )
   })
 }

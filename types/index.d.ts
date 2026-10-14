@@ -12,6 +12,8 @@ export type Flow = {
   done: number
   phase: Phase
   isFinished: boolean
+  /** When the flow was reported finished; its band steps aside a little after. */
+  finishedAt?: number
   tasks: PlannedTask[]
 }
 

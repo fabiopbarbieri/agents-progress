@@ -11,8 +11,9 @@ export const spawn = (id: string, type = 'general-purpose') => ({
 })
 
 // The engine beneath the plugin: panes always place, each run gets `a-<description>`
-// on the model `models` names for it (Sonnet otherwise), and a turn answers.
-export const engine = (on: On, models: Record<string, string> = {}): string[] => {
+// on the model `models` names for it (Sonnet otherwise), a turn answers, and the
+// band beneath is blank unless `below` draws one.
+export const engine = (on: On, models: Record<string, string> = {}, below?: string): string[] => {
   const opened: string[] = []
   on('ui.open', async (_$, e) => {
     opened.push(e.id)
@@ -20,6 +21,9 @@ export const engine = (on: On, models: Record<string, string> = {}): string[] =>
   })
   on('agent.spawn', async (_$, e) => ({ model: models[e.description] ?? 'claude-sonnet-5-5', agentId: `a-${e.description}` }))
   on('turn.complete', async (_$, e) => ({ text: e.answer ?? '' }) as never)
+  on('ui.render', { component: 'AbovePrompt' }, async () =>
+    (below === undefined ? { type: 'Box', props: {}, children: [] } : { type: 'Text', props: {}, children: [below] }) as never,
+  )
   return opened
 }
 
