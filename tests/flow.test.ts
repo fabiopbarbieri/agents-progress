@@ -16,8 +16,8 @@ const request = async ($: { turn: unknown }, id: string) => {
   for await (const _ of stream);
 }
 
-test('a new title starts a clean flow; the same title keeps its count and re-plans', async ($, on) => {
-  mock.clock(on, { now: 1000 })
+test('a new title starts a new flow; the same title keeps its count and re-plans', async ($, on) => {
+  const clock = mock.clock(on, { now: 1000 })
   engine(on)
   await $.tool.call(progress({ title: 'First', phase: 'delegate', tasks: [{ title: 'a', tier: 'light' }, { title: 'b', tier: 'medium' }] }))
   expect(await $.tool.call(progress({ done: 5 }))).toEqual({ result: 'ok: Tasks 2/2' })
@@ -27,13 +27,30 @@ test('a new title starts a clean flow; the same title keeps its count and re-pla
 
   await finishRuns($, 1)
   await $.agent.spawn(spawn('2') as never)
+  await clock.advance(1_000)
   expect(await $.tool.call(progress({ title: 'Second', phase: 'review', total: 1 }))).toEqual({ result: 'ok: Review 0/1' })
 
-  // The finished run left with the old flow; the one still at work stayed.
+  // The pane keeps the session's runs, the finished one and the one at work.
   const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
   expect(await ui.find({ type: 'Text', text: 'task 2' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: 'task 1' })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: 'task 1' })).toBeDefined()
   await ui.unmount()
+})
+
+test("a run of an earlier flow is not the new flow's task of the same name", async ($, on) => {
+  const clock = mock.clock(on, { now: 1000 })
+  engine(on)
+  await $.tool.call(progress({ title: 'First', phase: 'delegate', tasks: [{ title: 'task 1', tier: 'light' }] }))
+  await finishRuns($, 1)
+  await clock.advance(1_000)
+  await $.tool.call(progress({ title: 'Second', phase: 'delegate', tasks: [{ title: 'task 1', tier: 'light' }] }))
+
+  const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
+  expect(await ui.find({ type: 'Text', text: /1\. task 1/ })).toBeDefined()
+  await ui.unmount()
+  const band = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...BAND })
+  expect(await band.find({ type: 'Button', key: 'agents-pane' })).toMatchObject({ props: { label: '×1' } })
+  await band.unmount()
 })
 
 test('planned tasks wait in the pane until a run of the same description starts', async ($, on) => {

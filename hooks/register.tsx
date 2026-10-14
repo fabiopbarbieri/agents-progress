@@ -448,9 +448,12 @@ const elapsed = (a: AgentRun, at: number): number => (a.endedAt ?? Math.max(at, 
 
 type Planned = PlannedTask & { n: number }
 
+// The runs started since the flow began: earlier runs of the session are not its tasks.
+const runsOf = (f: Flow, list: AgentRun[]): AgentRun[] => list.filter(a => a.startedAt >= (f.startedAt ?? 0))
+
 const plannedOf = (f: Flow | null, list: AgentRun[]): Planned[] => {
   if (!f || f.isFinished) return []
-  const started = new Set(list.map(a => norm(a.description)))
+  const started = new Set(runsOf(f, list).map(a => norm(a.description)))
   return (f.tasks ?? []).map((t, i) => ({ ...t, n: i + 1 })).filter(t => !started.has(norm(t.title)))
 }
 
@@ -862,15 +865,15 @@ export const register: Register = (on, options) => {
 
   on('tool.call', { tool: TOOL }, async ($, e) => {
     const input = e as unknown as ProgressInput
-    const prev = await read($, flow)
-    if (isNewFlow(prev, input) && input.title !== undefined) {
-      // A new flow starts with a clean list; agents still running stay.
-      await patchAgents($, list => list.filter(a => a.status === 'running'))
-    }
+    // The pane keeps every run of the session; a new flow only marks when it began.
     const at = await $.clock.now()
     const next = await patchFlow($, p => {
       const merged = merge(p, input)
-      return merged.isFinished ? { ...merged, finishedAt: at } : merged
+      return {
+        ...merged,
+        ...(isNewFlow(p, input) ? { startedAt: at } : {}),
+        ...(merged.isFinished ? { finishedAt: at } : {}),
+      }
     })
     if (next?.isFinished) stepAside($, next)
     if (next && input.tasks?.length) await autoOpen($, next.title)
@@ -1180,7 +1183,7 @@ export const register: Register = (on, options) => {
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
     const list = await read($, agents)
-    const crew = list.length + plannedOf(f, list).length
+    const crew = runsOf(f, list).length + plannedOf(f, list).length
     const running = runningOf(list)
     const crewButton = (
       <Button key="agents-pane" label={`×${crew}`} plain onPress={() => void togglePane($)} />
