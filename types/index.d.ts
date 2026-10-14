@@ -46,6 +46,8 @@ export type AgentRun = {
 export type Panel = {
   isCompact: boolean
   isDoneCollapsed: boolean
+  /** Every finished run drawn, not only the latest ten; absent in a panel held from before. */
+  isEarlierShown?: boolean
   autoOpenedFor: string
 }
 

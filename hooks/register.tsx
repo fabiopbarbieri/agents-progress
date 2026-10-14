@@ -61,6 +61,7 @@ const STRINGS = {
     running: 'Running',
     finished: 'Finished',
     earlier: 'earlier',
+    fewer: 'Show fewer',
     planned: 'Planned',
     empty: 'No subagents yet.',
     round: 'round',
@@ -91,6 +92,7 @@ const STRINGS = {
     running: 'Em execução',
     finished: 'Concluídos',
     earlier: 'anteriores',
+    fewer: 'Mostrar menos',
     planned: 'Planejados',
     empty: 'Nenhum subagente ainda.',
     round: 'rodada',
@@ -121,6 +123,7 @@ const STRINGS = {
     running: 'Работают',
     finished: 'Завершены',
     earlier: 'ранее',
+    fewer: 'Показать меньше',
     planned: 'Запланированы',
     empty: 'Субагентов пока нет.',
     round: 'раунд',
@@ -1016,8 +1019,8 @@ export const register: Register = (on, options) => {
 
     const running = list.filter(a => a.status === 'running').reverse()
     const finished = list.filter(a => a.status !== 'running').reverse()
-    const shownDone = p.isDoneCollapsed ? [] : finished.slice(0, FINISHED_SHOWN)
-    const earlier = p.isDoneCollapsed ? 0 : finished.length - shownDone.length
+    const shownDone = p.isDoneCollapsed ? [] : p.isEarlierShown ? finished : finished.slice(0, FINISHED_SHOWN)
+    const earlier = p.isDoneCollapsed ? 0 : finished.length - finished.slice(0, FINISHED_SHOWN).length
     const planned = plannedOf(f, list)
     const t = totals(list, at)
     // The pane's title says "Agents"; inside, only the flow's own name.
@@ -1039,6 +1042,16 @@ export const register: Register = (on, options) => {
         onPress={() => update($, panel, prev => ({ ...prev, isDoneCollapsed: !prev.isDoneCollapsed }))}
       />
     )
+    // Past the latest FINISHED_SHOWN, the rest of the session's runs open on demand.
+    const toggleEarlier =
+      earlier > 0 ? (
+        <Button
+          key="earlier"
+          label={p.isEarlierShown ? `▴ ${s.fewer}` : `+${earlier} ${s.earlier}`}
+          plain
+          onPress={() => update($, panel, prev => ({ ...prev, isEarlierShown: !prev.isEarlierShown }))}
+        />
+      ) : null
     const isEmpty = list.length === 0 && planned.length === 0
     const summary = `≈${fmtCost(t.cost)}, ${fmtTokens(t.tokens)} ${s.tokensWord}, ${fmtTime(t.time)}`
 
@@ -1072,7 +1085,7 @@ export const register: Register = (on, options) => {
           {shownDone.map(a => (
             <Svg key={a.id} source={agentSvg(W, a, at)} alt={`${a.description}: ${modelName(a.model)}, ${s.isFinished}`} width={W} height={66} />
           ))}
-          {earlier > 0 && section('h-earlier', `+${earlier} ${s.earlier}`)}
+          {toggleEarlier}
           {planned.length > 0 && section('h-plan', `${s.planned} · ${planned.length}`)}
           {planned.map(pl => (
             <Svg key={`plan-${pl.n}`} source={plannedSvg(W, pl)} alt={`${pl.n}. ${pl.title}: ${s.isPlanned}`} width={W} height={46} />
@@ -1148,11 +1161,7 @@ export const register: Register = (on, options) => {
             {running.map(row)}
             {finished.length > 0 && toggleDone}
             {shownDone.map(row)}
-            {earlier > 0 && (
-              <Text dimColor>
-                +{earlier} {s.earlier}
-              </Text>
-            )}
+            {toggleEarlier}
             {planned.length > 0 && <Text dimColor>{s.planned} · {planned.length}</Text>}
             {planned.map(pl => {
               const tier = pl.tier in TIER_COLOR ? pl.tier : 'other'
