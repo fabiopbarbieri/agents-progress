@@ -151,7 +151,6 @@ const blank = (): Flow => ({
   title: tr().flow,
   total: 0,
   done: 0,
-  running: 0,
   phase: 'plan',
   isFinished: false,
   tasks: [],
@@ -187,12 +186,16 @@ const merge = (prev: Flow | null, input: ProgressInput): Flow => {
   }
 }
 
-const label = (f: Flow): string => {
+// Runs still at work. The Agent tool answers as soon as a background run starts,
+// so only the runs' own status says how many are out.
+const runningOf = (list: AgentRun[]): number => list.filter(a => a.status === 'running').length
+
+const label = (f: Flow, running: number): string => {
   const s = tr()
   if (f.isFinished) return s.done
   if (f.phase === 'plan') return s.plan
   if (f.phase === 'design') return s.design
-  const count = f.total ? `${f.done}/${f.total}` : `${f.running} ${s.busy}`
+  const count = f.total ? `${f.done}/${f.total}` : `${running} ${s.busy}`
   return `${f.phase === 'review' ? s.review : s.tasks} ${count}`
 }
 
@@ -235,7 +238,8 @@ const fitText = (s: string, size: number, maxW: number): string => {
   return out + '…'
 }
 
-const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
+const rowSvg = (f: Flow, W: number, running: number): string => {
+  const isWorking = running > 0
   // The title takes what it needs, up to 40% of the row; the bar takes the rest.
   const title = fitText(f.title, 13, Math.max(60, W * 0.4))
   const BAR_X = Math.round(16 + textWidth(title, 13) + 12)
@@ -243,7 +247,7 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
   const color = f.isFinished ? DONE : ACCENT
   const y0 = (H - BAR_H) / 2
   const fillW = Math.round(BAR_W * ratio(f))
-  const runW = f.total ? Math.round((BAR_W * Math.min(f.total, f.done + f.running)) / f.total) : 0
+  const runW = f.total ? Math.round((BAR_W * Math.min(f.total, f.done + running)) / f.total) : 0
   const dots: string[] = []
 
   // Dithered fill: sparse at the start, dense toward the head.
@@ -269,7 +273,7 @@ const rowSvg = (f: Flow, W: number, isWorking: boolean): string => {
     if (x > fillW + 4) ticks.push(`<rect x="${x}" y="${BAR_H / 2 - 4}" width="1.5" height="8" rx="0.75"/>`)
   }
 
-  const text = label(f)
+  const text = label(f, running)
   const pillW = Math.round(18 + text.length * 6.6)
   const pillX = Math.max(0, Math.min(BAR_W - pillW, fillW - pillW))
   const percent = `${Math.round(ratio(f) * 100)}%`
@@ -770,7 +774,7 @@ export const register: Register = (on, options) => {
     }
     const next = await update($, flow, p => merge(p, input))
     if (next && input.tasks?.length) await autoOpen($, next.title)
-    return { result: `ok: ${label(next ?? blank())}` }
+    return { result: `ok: ${label(next ?? blank(), runningOf(await read($, agents)))}` }
   })
 
   // A worker's own progress: the call runs in the worker's loop, so agentId names it.
@@ -787,24 +791,6 @@ export const register: Register = (on, options) => {
       }),
     )
     return { result: 'ok' }
-  })
-
-  // Safety net: while a reported flow is open, launches move the faint layer even if
-  // nobody reports them. Without a flow there is no bar: the panel alone shows the run.
-  on('tool.call', { tool: 'Agent' }, async ($, e, next) => {
-    const f = await read($, flow)
-    if (!f || f.isFinished) return next(e)
-
-    await update($, flow, prev =>
-      prev && !prev.isFinished
-        ? { ...prev, running: prev.running + 1, phase: prev.phase === 'plan' ? 'delegate' : prev.phase }
-        : prev,
-    )
-    try {
-      return await next(e)
-    } finally {
-      await update($, flow, prev => (prev ? { ...prev, running: Math.max(0, prev.running - 1) } : prev))
-    }
   })
 
   on('agent.spawn', async ($, e, next) => {
@@ -833,6 +819,8 @@ export const register: Register = (on, options) => {
       return [...list.filter(a => a.id !== run.id), run].slice(-200)
     })
     await update($, now, () => at)
+    // A run started under a flow still planning moves it to delegating.
+    await update($, flow, prev => (prev && !prev.isFinished && prev.phase === 'plan' ? { ...prev, phase: 'delegate' } : prev))
     // Any subagent opens the panel: once per reported flow, else once per busy spell
     // (a run started while none was running), so closing it sticks until the next one.
     const f = await read($, flow)
@@ -1082,7 +1070,7 @@ export const register: Register = (on, options) => {
     const { Box, Text, Button } = ui
     const list = await read($, agents)
     const crew = list.length + plannedOf(f, list).length
-    const isWorking = list.some(a => a.status === 'running')
+    const running = runningOf(list)
     const crewButton = (
       <Button key="agents-pane" label={`×${crew}`} plain onPress={() => void togglePane($)} />
     )
@@ -1105,7 +1093,7 @@ export const register: Register = (on, options) => {
       const width = Math.max(180, Math.min(1600, (e.props.bodyColumns || 100) * 8 - 96))
       return (
         <Box flexDirection="row" alignItems="center" gap={1}>
-          <Svg source={rowSvg(f, width, isWorking)} alt={`${f.title}: ${label(f)}, ${percent}`} width={width} height={H} />
+          <Svg source={rowSvg(f, width, running)} alt={`${f.title}: ${label(f, running)}, ${percent}`} width={width} height={H} />
           {crewButton}
           {dismiss}
         </Box>
@@ -1122,7 +1110,7 @@ export const register: Register = (on, options) => {
           <Text wrap="truncate-end">{f.title}</Text>
         </Box>
         <Text color={f.isFinished ? DONE : ACCENT}>{barText(f, width)}</Text>
-        <Text bold>{label(f)}</Text>
+        <Text bold>{label(f, running)}</Text>
         <Text dimColor>{percent}</Text>
         <Text color={CLAY}>▣</Text>
         {crewButton}

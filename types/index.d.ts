@@ -10,7 +10,6 @@ export type Flow = {
   title: string
   total: number
   done: number
-  running: number
   phase: Phase
   isFinished: boolean
   tasks: PlannedTask[]
