@@ -5,17 +5,17 @@ import { BAND, engine, progress, spawn } from './kit'
 test('the flow counts runs still at work, though the Agent tool already answered', async ($, on) => {
   mock.clock(on, { now: 1000 })
   engine(on)
-  expect(await $.tool.call(progress({ title: 'Probe', phase: 'delegate' }))).toEqual({ result: 'ok: Tasks 0 running' })
+  expect(await $.tool.call(progress({ title: 'Probe', phase: 'delegate' }))).toEqual({ result: 'ok: Tasks running: 0' })
 
   await $.agent.spawn(spawn('1') as never)
   await $.agent.spawn(spawn('2') as never)
-  expect(await $.tool.call(progress({}))).toEqual({ result: 'ok: Tasks 2 running' })
+  expect(await $.tool.call(progress({}))).toEqual({ result: 'ok: Tasks running: 2' })
 
   const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...BAND })
-  expect(await ui.find({ type: 'Text', text: 'Tasks 2 running' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'Tasks running: 2' })).toBeDefined()
 
   await $.turn.complete({ agentId: 'a-task 1', reason: 'answer', answer: 'ok' } as never)
-  expect(await ui.find({ type: 'Text', text: 'Tasks 1 running' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'Tasks running: 1' })).toBeDefined()
   await ui.unmount()
 })
 

@@ -78,7 +78,7 @@ const STRINGS = {
     design: 'Design',
     tasks: 'Tasks',
     review: 'Review',
-    busy: 'running',
+    busy: 'Tasks running',
     flow: 'Progress',
   },
   pt: {
@@ -108,7 +108,7 @@ const STRINGS = {
     design: 'Design',
     tasks: 'Tarefas',
     review: 'Revisão',
-    busy: 'em execução',
+    busy: 'Tarefas em execução',
     flow: 'Progresso',
   },
   ru: {
@@ -138,7 +138,7 @@ const STRINGS = {
     design: 'Дизайн',
     tasks: 'Задачи',
     review: 'Ревью',
-    busy: 'в работе',
+    busy: 'Задачи в работе',
     flow: 'Прогресс',
   },
 } as const
@@ -214,8 +214,10 @@ const label = (f: Flow, running: number): string => {
   if (f.isFinished) return s.done
   if (f.phase === 'plan') return s.plan
   if (f.phase === 'design') return s.design
-  const count = f.total ? `${f.done}/${f.total}` : `${running} ${s.busy}`
-  return `${f.phase === 'review' ? s.review : s.tasks} ${count}`
+  const isReview = f.phase === 'review'
+  // Without a plan there is no x/y, only how many run now: "Tarefas em execução: 2".
+  if (!f.total) return `${isReview ? s.review : s.busy}: ${running}`
+  return `${isReview ? s.review : s.tasks} ${f.done}/${f.total}`
 }
 
 const ratio = (f: Flow): number => (f.isFinished ? 1 : f.total ? f.done / f.total : 0)
