@@ -27,6 +27,17 @@ export const engine = (on: On, models: Record<string, string> = {}, below?: stri
   return opened
 }
 
+type Runs = {
+  agent: { spawn: (e: never) => Promise<unknown> }
+  turn: { complete: (e: never) => Promise<unknown> }
+}
+
+// Starts runs `task 1` to `task <n>`, then lets each answer.
+export const finishRuns = async ($: Runs, n: number): Promise<void> => {
+  for (let i = 1; i <= n; i++) await $.agent.spawn(spawn(String(i)) as never)
+  for (let i = 1; i <= n; i++) await $.turn.complete({ agentId: `a-task ${i}`, reason: 'answer', answer: 'ok' } as never)
+}
+
 export const progress = (input: Record<string, unknown>) => ({ tool: 'mcp__agents-progress__progress', ...input }) as never
 
 export const BAND = { component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, bodyColumns: 100 } } as const

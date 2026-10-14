@@ -46,6 +46,7 @@ const STRINGS = {
     expand: 'Expand',
     running: 'Running',
     finished: 'Finished',
+    earlier: 'earlier',
     planned: 'Planned',
     empty: 'No subagents yet.',
     round: 'round',
@@ -75,6 +76,7 @@ const STRINGS = {
     expand: 'Expandir',
     running: 'Em execução',
     finished: 'Concluídos',
+    earlier: 'anteriores',
     planned: 'Planejados',
     empty: 'Nenhum subagente ainda.',
     round: 'rodada',
@@ -104,6 +106,7 @@ const STRINGS = {
     expand: 'Развернуть',
     running: 'Работают',
     finished: 'Завершены',
+    earlier: 'ранее',
     planned: 'Запланированы',
     empty: 'Субагентов пока нет.',
     round: 'раунд',
@@ -279,6 +282,7 @@ const rowSvg = (f: Flow, W: number, running: number): string => {
   const pillW = Math.round(18 + text.length * 6.6)
   const pillX = Math.max(0, Math.min(BAR_W - pillW, fillW - pillW))
   const percent = `${Math.round(ratio(f) * 100)}%`
+  const walker = crab(W - CRAB_W + 1, 0, 'other', false, isWorking, 0.8)
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
 <style>
@@ -304,7 +308,7 @@ const rowSvg = (f: Flow, W: number, running: number): string => {
 <text x="${pillX + pillW / 2}" y="${BAR_H / 2 + 4}" text-anchor="middle" font-family="${FONT}" font-size="11" font-weight="600" fill="#ffffff">${xml(text)}</text>
 </g>
 <text class="m" x="${W - CRAB_W - 6}" y="${H / 2 + 4.5}" text-anchor="end" font-family="${FONT}" font-size="12.5" font-variant-numeric="tabular-nums">${percent}</text>
-${CRAB_CSS}${crab(W - CRAB_W + 1, 0, 'other', false, isWorking, 0.8)}
+${crabCss(walker)}${walker}
 </svg>`
 }
 
@@ -460,32 +464,41 @@ const crabBody = (f: Fill, armFront = 0, armCls?: string): void => {
 
 // Pure CSS, run by the compositor: no redraws. Periods divide one second, so the
 // once-a-second redraw of a running row restarts them in phase. Every crab walks;
-// each costume adds its prop's own motion on top.
-const CRAB_CSS = `<style>
-.run .la{animation:st .5s steps(1) infinite}.run .lb{animation:st .5s steps(1) infinite -.25s}
+// each costume adds its prop's own motion on top. A drawing carries only the rules
+// of the costumes walking in it, and none when no crab walks.
+const WALK_CSS = `.run .la{animation:st .5s steps(1) infinite}.run .lb{animation:st .5s steps(1) infinite -.25s}
 .run .bd{animation:bob .5s steps(1) infinite -.125s}
 .run g{transform-box:fill-box}
 @keyframes st{50%{transform:translateY(-1px)}}@keyframes bob{50%{transform:translateY(1px)}}
-.c-fable.run{animation:float 1s ease-in-out infinite}
+@keyframes blink{50%{opacity:.15}}
+@media (prefers-reduced-motion: reduce){.run,.run g{animation:none!important}}`
+
+const COSTUME_CSS: Record<string, string> = {
+  fable: `.c-fable.run{animation:float 1s ease-in-out infinite}
 .c-fable.run .la,.c-fable.run .lb,.c-fable.run .bd{animation:none}
 .c-fable.run .ant{animation:blink 1s steps(1) infinite}
 .c-fable.run .star{animation:blink .5s steps(1) infinite -.25s}
-@keyframes float{50%{transform:translateY(-2px)}}@keyframes blink{50%{opacity:.15}}
-.c-heavy.run .it{animation:scan 1s steps(1) infinite}
+@keyframes float{50%{transform:translateY(-2px)}}`,
+  heavy: `.c-heavy.run .it{animation:scan 1s steps(1) infinite}
 .c-heavy.run .gl{animation:blink 1s steps(1) infinite -.5s}
-@keyframes scan{25%{transform:translate(-1px,1px)}50%{transform:translate(-2px,2px)}75%{transform:translate(-1px,1px)}}
-.c-careful.run .it{transform-origin:100% 100%;animation:twist .5s ease-in-out infinite}
-@keyframes twist{50%{transform:rotate(-35deg)}}
-.c-medium.run .pan{transform-origin:0 50%;animation:tilt 1s ease-in-out infinite}
+@keyframes scan{25%{transform:translate(-1px,1px)}50%{transform:translate(-2px,2px)}75%{transform:translate(-1px,1px)}}`,
+  careful: `.c-careful.run .it{transform-origin:100% 100%;animation:twist .5s ease-in-out infinite}
+@keyframes twist{50%{transform:rotate(-35deg)}}`,
+  medium: `.c-medium.run .pan{transform-origin:0 50%;animation:tilt 1s ease-in-out infinite}
 .c-medium.run .egg{animation:flip 1s ease-in-out infinite}
-@keyframes tilt{20%,40%{transform:rotate(-12deg)}}@keyframes flip{30%{transform:translateY(-5px) scaleY(-1)}60%{transform:translateY(0)}}
-.c-light.run .la{animation-duration:.25s}.c-light.run .lb{animation-duration:.25s;animation-delay:-.125s}
+@keyframes tilt{20%,40%{transform:rotate(-12deg)}}@keyframes flip{30%{transform:translateY(-5px) scaleY(-1)}60%{transform:translateY(0)}}`,
+  light: `.c-light.run .la{animation-duration:.25s}.c-light.run .lb{animation-duration:.25s;animation-delay:-.125s}
 .c-light.run .flag{transform-origin:0 50%;animation:wave .25s steps(1) infinite}
-@keyframes wave{50%{transform:skewY(-12deg) scaleX(.85)}}
-.c-explore.run .it{transform-origin:50% 100%;animation:fence .5s ease-in-out infinite}
-@keyframes fence{50%{transform:rotate(25deg)}}
-@media (prefers-reduced-motion: reduce){.run,.run g{animation:none!important}}
-</style>`
+@keyframes wave{50%{transform:skewY(-12deg) scaleX(.85)}}`,
+  explore: `.c-explore.run .it{transform-origin:50% 100%;animation:fence .5s ease-in-out infinite}
+@keyframes fence{50%{transform:rotate(25deg)}}`,
+}
+
+const crabCss = (markup: string): string => {
+  const walking = new Set([...markup.matchAll(/class="c-([a-z]+) run"/g)].map(m => m[1] ?? ''))
+  if (!walking.size) return ''
+  return `<style>${WALK_CSS}${[...walking].map(c => COSTUME_CSS[c] ?? '').join('')}</style>`
+}
 
 const COSTUMES: Record<string, (f: Fill, t: string) => void> = {
   // Fable: astronaut in a glass dome; floats instead of walking, the antenna and the star blink.
@@ -541,16 +554,23 @@ const CRAB_SCALE = 1.1
 // Body and props nest inside `bd` so a prop rides the bob and adds its own motion;
 // legs stay outside it and step on their own.
 const crab = (x: number, y: number, costume: string, dim = false, isWalking = false, scale = CRAB_SCALE): string => {
-  const groups = new Map<string, string[]>([['bd', []]])
+  // Cells in a row of one colour become one path, in drawing order, so what
+  // overlaps still overlaps the same way: a few paths instead of ~150 rects.
+  const groups = new Map<string, { c: string; d: string }[]>([['bd', []]])
   const f: Fill = (cx, cy, w, h, c, cls = 'bd') => {
-    if (!groups.has(cls)) groups.set(cls, [])
-    groups.get(cls)?.push(`<rect x="${cx}" y="${cy}" width="${w}" height="${h}" fill="${c}"/>`)
+    const runs = groups.get(cls) ?? []
+    groups.set(cls, runs)
+    const cell = `M${cx} ${cy}h${w}v${h}h${-w}z`
+    const last = runs[runs.length - 1]
+    if (last?.c === c) last.d += cell
+    else runs.push({ c, d: cell })
   }
   const draw = COSTUMES[costume] ?? ((g: Fill) => crabBody(g))
   draw(f, colorOf(costume))
-  const group = (cls: string) => `<g class="${cls}">${(groups.get(cls) ?? []).join('')}</g>`
+  const paths = (cls: string) => (groups.get(cls) ?? []).map(r => `<path fill="${r.c}" d="${r.d}"/>`).join('')
+  const group = (cls: string) => `<g class="${cls}">${paths(cls)}</g>`
   const props = [...groups.keys()].filter(k => k !== 'bd' && k !== 'la' && k !== 'lb')
-  const body = `<g class="bd">${(groups.get('bd') ?? []).join('')}${props.map(group).join('')}</g>`
+  const body = `<g class="bd">${paths('bd')}${props.map(group).join('')}</g>`
   return `<g transform="translate(${x},${y}) scale(${scale})" opacity="${dim ? 0.45 : 1}" shape-rendering="crispEdges"><g class="c-${costume}${isWalking ? ' run' : ''}">${body}${group('la')}${group('lb')}</g></g>`
 }
 
@@ -562,7 +582,7 @@ const statusMark = (x: number, y: number, status: string, color: string): string
 }
 
 const svg = (W: number, H: number, body: string): string =>
-  `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${PANE_CSS}${CRAB_CSS}${body}</svg>`
+  `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${PANE_CSS}${crabCss(body)}${body}</svg>`
 
 // The pane's own title already says "Agents": the header names the flow, if any.
 const headerSvg = (W: number, title: string, t: ReturnType<typeof totals>): string => {
@@ -667,6 +687,9 @@ const ctxBar = (pct: number, width: number): string => {
   const filled = Math.round((width * pct) / 100)
   return '█'.repeat(filled) + '░'.repeat(Math.max(0, width - filled))
 }
+
+// The pane draws the latest finished runs; the totals still count every run.
+const FINISHED_SHOWN = 10
 
 const STATUS_GLYPH: Record<string, string> = { running: '●', done: '✓', failed: '✗', planned: '◷' }
 
@@ -936,6 +959,8 @@ export const register: Register = (on, options) => {
 
     const running = list.filter(a => a.status === 'running').reverse()
     const finished = list.filter(a => a.status !== 'running').reverse()
+    const shownDone = p.isDoneCollapsed ? [] : finished.slice(0, FINISHED_SHOWN)
+    const earlier = p.isDoneCollapsed ? 0 : finished.length - shownDone.length
     const planned = plannedOf(f, list)
     const t = totals(list, at)
     // The pane's title says "Agents"; inside, only the flow's own name.
@@ -987,10 +1012,10 @@ export const register: Register = (on, options) => {
             <Svg key={a.id} source={agentSvg(W, a, at)} alt={`${a.description}: ${modelName(a.model)}, ${s.isRunning}`} width={W} height={66} />
           ))}
           {finished.length > 0 && toggleDone}
-          {!p.isDoneCollapsed &&
-            finished.map(a => (
-              <Svg key={a.id} source={agentSvg(W, a, at)} alt={`${a.description}: ${modelName(a.model)}, ${s.isFinished}`} width={W} height={66} />
-            ))}
+          {shownDone.map(a => (
+            <Svg key={a.id} source={agentSvg(W, a, at)} alt={`${a.description}: ${modelName(a.model)}, ${s.isFinished}`} width={W} height={66} />
+          ))}
+          {earlier > 0 && section('h-earlier', `+${earlier} ${s.earlier}`)}
           {planned.length > 0 && section('h-plan', `${s.planned} · ${planned.length}`)}
           {planned.map(pl => (
             <Svg key={`plan-${pl.n}`} source={plannedSvg(W, pl)} alt={`${pl.n}. ${pl.title}: ${s.isPlanned}`} width={W} height={46} />
@@ -1065,7 +1090,12 @@ export const register: Register = (on, options) => {
             {running.length > 0 && <Text dimColor>{s.running} · {running.length}</Text>}
             {running.map(row)}
             {finished.length > 0 && toggleDone}
-            {!p.isDoneCollapsed && finished.map(row)}
+            {shownDone.map(row)}
+            {earlier > 0 && (
+              <Text dimColor>
+                +{earlier} {s.earlier}
+              </Text>
+            )}
             {planned.length > 0 && <Text dimColor>{s.planned} · {planned.length}</Text>}
             {planned.map(pl => {
               const tier = pl.tier in TIER_COLOR ? pl.tier : 'other'
