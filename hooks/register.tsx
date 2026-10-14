@@ -766,9 +766,10 @@ function stepAside($: EngineInterface, f: Flow): void {
   })()
 }
 
-// What core draws when no plugin has a band to show.
+// Nothing another plugin drew: core's own band (an `engine` element, which the band
+// replaced before too) or an empty box.
 const isBlank = (el: RenderElement | undefined): boolean =>
-  !el || ((el.type === 'Box' || (el.type as string) === 'Fragment') && (el.children ?? []).length === 0)
+  !el || el.type === 'engine' || (el.type === 'Box' && (el.children ?? []).length === 0)
 
 export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {

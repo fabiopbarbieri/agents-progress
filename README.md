@@ -26,3 +26,15 @@ claude plugin install agents-progress@agents-progress-local
 ```
 
 The marketplace is this folder and the entry's source is relative, so the session reads the plugin from here: edit, then `/reload-plugins`.
+
+## Checks
+
+```bash
+claude plugin validate . --strict
+claude plugin test .
+npx -p typescript@5 tsc -p .
+```
+
+`claude plugin test` runs `tests/*.test.ts` against the engine's own host, on the terminal and desktop surfaces; `tests/kit.ts` stands for the engine beneath the mod. It checks the hooks and the trees they return, not how a surface paints them.
+
+`tsc` reads the API types the engine lays in `.claude-plugin/types/` (ignored by Git) when an interactive session loads the mod from its folder, as `claude --plugin-dir .` does; a `claude -p` run does not lay them. Tests stay out of it, as their fixtures are partial.
