@@ -12,7 +12,7 @@ test('an idle session reads nothing on the clock; a run at work ticks it', async
     return next(e)
   })
   on('state.set', async (_$, e, next) => {
-    if ((e as { key?: string }).key ?? '' === 'now') ticks++
+    if ((e as { key?: string }).key === 'now') ticks++
     return next(e)
   })
 

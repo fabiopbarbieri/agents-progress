@@ -728,11 +728,15 @@ async function togglePane($: EngineInterface): Promise<boolean> {
   return true
 }
 
+// Marks the key once the pane opened (or waits for room, which seats it later);
+// an open that fails leaves it unmarked, so the next run tries again.
 async function autoOpen($: EngineInterface, key: string): Promise<void> {
   const p = await read($, panel)
   if (p.autoOpenedFor === key) return
-  await update($, panel, prev => ({ ...prev, autoOpenedFor: key }))
-  void $.ui.open({ id: PANE, title: tr().pane })
+  void $.ui
+    .open({ id: PANE, title: tr().pane })
+    .then(() => update($, panel, prev => ({ ...prev, autoOpenedFor: key })))
+    .catch(() => {})
 }
 
 // Ticks the running runs' clocks once a second, and stops when none runs: an idle
@@ -971,10 +975,10 @@ export const register: Register = (on, options) => {
               ? {
                   model: e.usage.model || a.model,
                   tokens:
-                    e.usage.input_tokens +
-                    e.usage.output_tokens +
-                    e.usage.cache_read_input_tokens +
-                    e.usage.cache_creation_input_tokens,
+                    (e.usage.input_tokens || 0) +
+                    (e.usage.output_tokens || 0) +
+                    (e.usage.cache_read_input_tokens || 0) +
+                    (e.usage.cache_creation_input_tokens || 0),
                   costUsd: costOf(e.usage.model || a.model, e.usage),
                 }
               : {}),
