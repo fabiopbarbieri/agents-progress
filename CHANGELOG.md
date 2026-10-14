@@ -2,6 +2,16 @@
 
 All notable changes to agents-progress. The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); see *Versioning* in the README.
 
+## [1.0.1] - 2026-10-14
+
+### Changed
+
+- The marketplace is named `agents-progress`, so the plugin installs as `agents-progress@agents-progress`. An install of 1.0.0 (`agents-progress@agents-progress-local`) is removed and installed again: `claude plugin uninstall agents-progress@agents-progress-local`, `claude plugin marketplace remove agents-progress-local`, then the install below.
+
+### Documentation
+
+- The README installs with one line at the prompt, `/plugin install agents-progress --marketplace fabiopbarbieri/agents-progress`, keeps the shell commands as the other way, and says the options are optional and how the desktop app gets the mod.
+
 ## [1.0.0] - 2026-10-14
 
 First release, forked from [savvy-progress](https://github.com/johnnyvizz/claude-kit/tree/main/plugins/savvy-progress) 1.2.0.
@@ -34,4 +44,5 @@ First release, forked from [savvy-progress](https://github.com/johnnyvizz/claude
 - The band's bar twinkles in four paths instead of up to ~1350 rects, and only while runs work.
 - State is written only when it changes, and the one-second ticker runs only while a run works.
 
+[1.0.1]: https://github.com/fabiopbarbieri/agents-progress/releases/tag/agents-progress--v1.0.1
 [1.0.0]: https://github.com/fabiopbarbieri/agents-progress/releases/tag/agents-progress--v1.0.0

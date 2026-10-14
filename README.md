@@ -23,10 +23,22 @@ Set them in `/config`.
 
 ## Install
 
+At the prompt of a Claude Code session in a terminal:
+
+```
+/plugin install agents-progress --marketplace fabiopbarbieri/agents-progress
+```
+
+Answer `y` to add the marketplace, then pick a scope. Or from a shell:
+
 ```bash
 claude plugin marketplace add fabiopbarbieri/agents-progress
-claude plugin install agents-progress@agents-progress-local
+claude plugin install agents-progress@agents-progress
 ```
+
+The Claude desktop app has no `/plugin` command: install from a terminal, and the mod loads in the app's local sessions too.
+
+The options are optional: the install may say they are not set, and their defaults apply until you change them in `/config`.
 
 To work on it, add your clone as the marketplace instead (`claude plugin marketplace add <path to the clone>`): the entry's source is relative, so the session reads the plugin from that folder. Edit, then `/reload-plugins`.
 

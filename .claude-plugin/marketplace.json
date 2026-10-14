@@ -1,6 +1,6 @@
 {
-  "name": "agents-progress-local",
-  "description": "Local marketplace for the agents-progress mod.",
+  "name": "agents-progress",
+  "description": "Marketplace for the agents-progress mod.",
   "owner": {
     "name": "Fabio Barbieri"
   },
