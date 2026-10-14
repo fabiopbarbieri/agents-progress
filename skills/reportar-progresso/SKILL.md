@@ -1,30 +1,30 @@
 ---
 name: reportar-progresso
-description: Reports delegated work to the agents-progress bar and panel through mcp__agents-progress__progress, and tells each subagent to report its own steps through mcp__agents-progress__step. Use when about to delegate two or more tasks to subagents (Agent tool), when planning a multi-step delegated job, or when the user asks to see progress of subagents.
+description: Reporta o trabalho delegado na barra e no painel do agents-progress via mcp__agents-progress__progress, e instrui cada subagente a reportar seus próprios passos via mcp__agents-progress__step. Use ao delegar duas ou mais tarefas a subagentes (ferramenta Agent), ao planejar um trabalho delegado em várias etapas, ou quando a pessoa pedir para ver o progresso dos subagentes.
 ---
 
 # Reportar progresso
 
-The agents panel opens by itself for any subagent and shows model, context, cost and time with no calls. These two tools add the plan and each task's own progress.
+O painel de agentes abre sozinho para qualquer subagente e mostra modelo, contexto, custo e tempo sem nenhuma chamada. Estas duas ferramentas acrescentam o plano e o progresso próprio de cada tarefa.
 
-If a tool is listed only by name (deferred), load it first with ToolSearch (`select:mcp__agents-progress__progress,mcp__agents-progress__step`).
+Se uma ferramenta aparece só pelo nome (deferred), carregue-a antes com ToolSearch (`select:mcp__agents-progress__progress,mcp__agents-progress__step`).
 
-## As the session that delegates
+## Na sessão que delega
 
-Call `mcp__agents-progress__progress` at these moments. Fields left out keep their value.
+Chame `mcp__agents-progress__progress` nestes momentos. Campos omitidos mantêm o valor anterior.
 
-1. After presenting the plan, before the first Agent call: `title` (a few words), `phase: "delegate"`, `tasks` in order.
-   - Each task's `title` must equal the `description` you will pass to the Agent tool, word for word; that is how the panel matches a run to its task.
-   - `tier` names the model the task runs on: `fable` = Fable, `heavy` = Opus for hard work, `careful` = Opus for delicate work, `medium` = Sonnet, `light` = Haiku.
-   - `after` lists the numbers (from 1) of tasks it waits for.
-2. Each time you accept a task's result: `done` with the count accepted so far.
-3. On a phase change (`plan`, `design`, `delegate`, `review`, `close`) or a re-plan: `phase`, or the new `tasks`.
-4. At the end: `finished: true`.
+1. Depois de apresentar o plano, antes da primeira chamada ao Agent: `title` (poucas palavras), `phase: "delegate"`, `tasks` em ordem.
+   - O `title` de cada tarefa deve ser idêntico, palavra por palavra, à `description` que você vai passar à ferramenta Agent; é assim que o painel associa uma execução à sua tarefa.
+   - `tier` indica o modelo em que a tarefa roda: `fable` = Fable, `heavy` = Opus para trabalho difícil, `careful` = Opus para trabalho delicado, `medium` = Sonnet, `light` = Haiku.
+   - `after` lista os números (a partir de 1) das tarefas pelas quais ela espera.
+2. A cada resultado de tarefa aceito: `done` com o total aceito até agora.
+3. Numa mudança de fase (`plan`, `design`, `delegate`, `review`, `close`) ou num replanejamento: `phase`, ou as novas `tasks`.
+4. No fim: `finished: true`.
 
-A single quick subagent needs none of this.
+Um único subagente rápido dispensa tudo isso.
 
-## In each brief you hand a subagent
+## Em cada briefing entregue a um subagente
 
-Add this paragraph to the Agent prompt, so the panel shows the task's own bar instead of its context fill:
+Acrescente este parágrafo ao prompt do Agent, para o painel mostrar a barra própria da tarefa em vez do preenchimento de contexto:
 
-> Report your progress with `mcp__agents-progress__step`: right after reading this brief, call it with `total` (your plan in 3 to 8 steps) and `done: 0`; call it again with the new `done` and a short `note` as each step finishes.
+> Reporte seu progresso com `mcp__agents-progress__step`: logo depois de ler este briefing, chame-a com `total` (seu plano em 3 a 8 passos) e `done: 0`; chame de novo com o novo `done` e uma `note` curta a cada passo concluído.
