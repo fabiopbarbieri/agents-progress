@@ -80,6 +80,27 @@ test("a worker's steps draw its own bar; a call from outside a subagent is ignor
   await ui.unmount()
 })
 
+test("a run that reports steps shows its task's percentage on both surfaces", async ($, on) => {
+  mock.clock(on, { now: 1000 })
+  engine(on)
+  await $.agent.spawn(spawn('1') as never)
+  await $.agent.spawn(spawn('2') as never)
+  await $.tool.call(step({ done: 2, total: 5, note: 'reading', agentId: 'a-task 1' }))
+
+  const term = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
+  expect(await term.find({ type: 'Text', text: /40% · 2\/5 reading · ctx/ })).toBeDefined()
+  // A run that reports nothing keeps its context share alone.
+  const percents = await term.findAll({ type: 'Text', text: /\d+% · \d+\/\d+/ })
+  expect(percents.length).toBeGreaterThan(0)
+  expect(percents.every(t => t.text.includes('2/5 reading'))).toBe(true)
+  await term.unmount()
+
+  const desk = await $.ui.mount({ plugin: 'agents-progress', surface: 'desktop', ...PANE })
+  const row = (await desk.findAll({ type: 'Svg' })).find(s => String(s.props.alt).startsWith('task 1:'))
+  expect(String(row?.props.source)).toContain('40% · 2/5 · reading')
+  await desk.unmount()
+})
+
 test("each model request adds the run's tokens and estimated cost", async ($, on) => {
   mock.clock(on, { now: 1000 })
   engine(on)

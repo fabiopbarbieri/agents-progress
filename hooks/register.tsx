@@ -651,6 +651,12 @@ const progressOf = (a: AgentRun): number | null => {
   return null
 }
 
+// The task's own percentage, for a run that reports its steps.
+const stepsOf = (a: AgentRun, sep: string): string =>
+  a.stepTotal
+    ? `${Math.round((progressOf(a) ?? 0) * 100)}% · ${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? sep + a.stepNote : ''}`
+    : ''
+
 const ctxOf = (a: AgentRun): number => (a.contextMax ? Math.min(100, Math.round((a.contextTokens / a.contextMax) * 100)) : 0)
 
 const agentSvg = (W: number, a: AgentRun, at: number): string => {
@@ -665,7 +671,7 @@ const agentSvg = (W: number, a: AgentRun, at: number): string => {
   const barW = textW
   const progress = progressOf(a)
   const stats = `ctx ${ctx}% · ${fmtTokens(a.contextTokens)}  ≈${fmtCost(a.costUsd)}  ${fmtTime(elapsed(a, at))}`
-  const steps = a.stepTotal ? `${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? ' · ' + a.stepNote : ''}` : ''
+  const steps = stepsOf(a, ' · ')
   const stepsW = Math.max(0, barW - textWidth(stats, 11) - 12)
   // Without reported steps the bar falls back to the context, drawn grey.
   const fillW = Math.round(barW * (progress ?? ctx / 100))
@@ -1103,7 +1109,7 @@ export const register: Register = (on, options) => {
       const ctx = ctxOf(a)
       const progress = progressOf(a)
       const model = a.effort ? `${modelName(a.model)} · ${a.effort}` : modelName(a.model)
-      const steps = a.stepTotal ? `${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? ' ' + a.stepNote : ''} · ` : ''
+      const steps = a.stepTotal ? `${stepsOf(a, ' ')} · ` : ''
       return (
         <Box key={a.id} flexDirection="column" marginBottom={1}>
           <Box flexDirection="row" gap={1}>
