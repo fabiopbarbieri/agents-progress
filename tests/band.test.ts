@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { BAND, engine, progress } from './kit'
+import { BAND, engine, progress, spawn } from './kit'
 
 test('the band draws its bar as text on the terminal and as one drawing on the desktop', async ($, on) => {
   mock.clock(on, { now: 1000 })
@@ -54,5 +54,23 @@ test('a flow reported again after it finished keeps its band', async ($, on) => 
   await clock.advance(10_000)
   const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...BAND })
   expect(await ui.find({ type: 'Text', text: 'Tasks 0/3' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('the bar twinkles only while runs are at work, in a handful of elements', async ($, on) => {
+  mock.clock(on, { now: 1000 })
+  engine(on)
+  await $.tool.call(progress({ title: 'Probe', phase: 'delegate', total: 4, done: 3 }))
+  const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'desktop', ...BAND, props: { ...BAND.props, bodyColumns: 200 } })
+  const source = async () => String((await ui.find({ type: 'Svg' }))?.props.source)
+
+  expect(await source()).not.toMatch(/animation/)
+  await $.agent.spawn(spawn('1') as never)
+  const working = await source()
+  expect(working).toMatch(/@keyframes tw/)
+  expect((working.match(/<(rect|path) /g) ?? []).length).toBeLessThan(40)
+
+  await $.tool.call(progress({ finished: true }))
+  expect(await source()).not.toMatch(/@keyframes tw/)
   await ui.unmount()
 })

@@ -253,7 +253,11 @@ const rowSvg = (f: Flow, W: number, running: number): string => {
   const y0 = (H - BAR_H) / 2
   const fillW = Math.round(BAR_W * ratio(f))
   const runW = f.total ? Math.round((BAR_W * Math.min(f.total, f.done + running)) / f.total) : 0
-  const dots: string[] = []
+  // Each layer's cells go into four paths, one per twinkle group: four animated
+  // elements however wide the bar, where every cell was one before.
+  const dots = ['', '', '', '']
+  const faint = ['', '', '', '']
+  const cell = (x: number, y: number, size: number) => `M${x} ${y}h${size}v${size}h${-size}z`
 
   // Dithered fill: sparse at the start, dense toward the head.
   const cols = Math.floor(fillW / CELL)
@@ -261,14 +265,13 @@ const rowSvg = (f: Flow, W: number, running: number): string => {
   for (let c = 0; c < cols; c++) {
     const density = 0.35 + 0.6 * Math.pow(c / Math.max(1, cols), 1.2)
     for (let r = 0; r < rows; r++) {
-      if (noise(c, r) < density) dots.push(`<rect class="t${Math.floor(noise(r, c) * 4)}" x="${c * CELL + 1}" y="${r * CELL + 1}" width="2" height="2"/>`)
+      if (noise(c, r) < density) dots[Math.floor(noise(r, c) * 4)] += cell(c * CELL + 1, r * CELL + 1, 2)
     }
   }
   // Handed to workers, not yet accepted: a faint second layer.
-  const faint: string[] = []
   for (let c = cols; c < Math.floor(runW / CELL); c++) {
     for (let r = 0; r < rows; r++) {
-      if (noise(c + 7, r + 3) < 0.2) faint.push(`<rect class="t${Math.floor(noise(r + 5, c) * 4)}" x="${c * CELL + 1}" y="${r * CELL + 1}" width="1.7" height="1.7"/>`)
+      if (noise(c + 7, r + 3) < 0.2) faint[Math.floor(noise(r + 5, c) * 4)] += cell(c * CELL + 1, r * CELL + 1, 1.7)
     }
   }
 
@@ -283,16 +286,21 @@ const rowSvg = (f: Flow, W: number, running: number): string => {
   const pillX = Math.max(0, Math.min(BAR_W - pillW, fillW - pillW))
   const percent = `${Math.round(ratio(f) * 100)}%`
   const walker = crab(W - CRAB_W + 1, 0, 'other', false, isWorking, 0.8)
+  const layer = (groups: string[]) => groups.map((d, k) => (d ? `<path class="t${k}" d="${d}"/>` : '')).join('')
+  // Pixels twinkle in four out-of-phase groups while runs are at work; otherwise the bar stands still.
+  const twinkle =
+    isWorking && !f.isFinished
+      ? `.t0,.t1,.t2,.t3{animation:tw 2.2s ease-in-out infinite}
+.t1{animation-duration:2.8s;animation-delay:-.7s}.t2{animation-duration:1.9s;animation-delay:-1.3s}.t3{animation-duration:3.3s;animation-delay:-.4s}
+@keyframes tw{0%,100%{opacity:1}50%{opacity:0.3}}
+@media (prefers-reduced-motion: reduce){.t0,.t1,.t2,.t3{animation:none}}`
+      : ''
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
 <style>
 .t{fill:#1f1f1f}.m{fill:#8a8a8a}.k{fill:#e4e4e2}.tk{fill:#b4b4b0}
 @media (prefers-color-scheme: dark){.t{fill:#ececec}.m{fill:#9a9a9a}.k{fill:#2c2c2c}.tk{fill:#5a5a5a}}
-/* Pixels twinkle in four out-of-phase groups; a finished bar settles to a slow glow. */
-.t0,.t1,.t2,.t3{animation:tw ${f.isFinished ? 3.2 : 2.2}s ease-in-out infinite}
-.t1{animation-duration:${f.isFinished ? 3.8 : 2.8}s;animation-delay:-.7s}.t2{animation-duration:${f.isFinished ? 4.4 : 1.9}s;animation-delay:-1.3s}.t3{animation-duration:${f.isFinished ? 3.5 : 3.3}s;animation-delay:-.4s}
-@keyframes tw{0%,100%{opacity:1}50%{opacity:${f.isFinished ? 0.8 : 0.3}}}
-@media (prefers-reduced-motion: reduce){.t0,.t1,.t2,.t3{animation:none}}
+${twinkle}
 </style>
 <defs><clipPath id="c"><rect x="0" y="0" width="${BAR_W}" height="${BAR_H}" rx="${BAR_H / 2}"/></clipPath></defs>
 <circle cx="5" cy="${H / 2}" r="4" fill="${color}"/>
@@ -300,8 +308,8 @@ const rowSvg = (f: Flow, W: number, running: number): string => {
 <g transform="translate(${BAR_X},${y0})">
 <rect class="k" width="${BAR_W}" height="${BAR_H}" rx="${BAR_H / 2}"/>
 <g clip-path="url(#c)">
-<g fill="${color}">${dots.join('')}</g>
-<g fill="${color}" opacity="0.45">${faint.join('')}</g>
+<g fill="${color}">${layer(dots)}</g>
+<g fill="${color}" opacity="0.45">${layer(faint)}</g>
 <g class="tk">${ticks.join('')}</g>
 </g>
 <rect x="${pillX}" width="${pillW}" height="${BAR_H}" rx="${BAR_H / 2}" fill="${color}"/>
