@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register, RenderElement } from 'claude-code'
+import type { EngineInterface, Register, RenderElement, Timer } from 'claude-code'
 
 import type { AgentRun, Flow, Panel, Phase, PlannedTask } from '../types'
 
@@ -11,6 +11,20 @@ const panel = atom({ plugin: 'agents-progress', key: 'panel' } as const, {
   autoOpenedFor: '',
 })
 const now = atom({ plugin: 'agents-progress', key: 'now' } as const, 0)
+
+// `update` writes, and so redraws every reader, even when the value stays the same:
+// these write only a change. One per value, as the engine's scan reads each by name.
+const same = (a: unknown, b: unknown): boolean => a === b || JSON.stringify(a) === JSON.stringify(b)
+
+async function patchFlow($: EngineInterface, change: (f: Flow | null) => Flow | null): Promise<Flow | null> {
+  const held = await read($, flow)
+  return same(change(held), held) ? held : update($, flow, change)
+}
+
+async function patchAgents($: EngineInterface, change: (list: AgentRun[]) => AgentRun[]): Promise<AgentRun[]> {
+  const held = await read($, agents)
+  return same(change(held), held) ? held : update($, agents, change)
+}
 
 const TOOL = 'mcp__agents-progress__progress'
 const STEP_TOOL = 'mcp__agents-progress__step'
@@ -721,6 +735,25 @@ async function autoOpen($: EngineInterface, key: string): Promise<void> {
   void $.ui.open({ id: PANE, title: tr().pane })
 }
 
+// Ticks the running runs' clocks once a second, and stops when none runs: an idle
+// session reads nothing. A run that starts or resumes starts it again.
+let ticker: Timer | null = null
+
+function startTicker($: EngineInterface): void {
+  if (ticker) return
+  ticker = $.clock.every(1000, () => {
+    void (async () => {
+      if (!(await read($, agents)).some(a => a.status === 'running')) {
+        ticker?.cancel()
+        ticker = null
+        return
+      }
+      const at = await $.clock.now()
+      await update($, now, () => at)
+    })()
+  })
+}
+
 // A finished flow leaves the band after FINISHED_LINGER_MS, unless a newer one took its place.
 function stepAside($: EngineInterface, f: Flow): void {
   const finishedAt = f.finishedAt
@@ -728,7 +761,7 @@ function stepAside($: EngineInterface, f: Flow): void {
   void (async () => {
     const wait = Math.max(0, finishedAt + FINISHED_LINGER_MS - (await $.clock.now()))
     $.clock.after(wait, () => {
-      void update($, flow, prev => (prev?.isFinished && prev.finishedAt === finishedAt ? null : prev))
+      void patchFlow($, prev => (prev?.isFinished && prev.finishedAt === finishedAt ? null : prev))
     })
   })()
 }
@@ -800,15 +833,8 @@ export const register: Register = (on, options) => {
       description: 'Show or hide the panel of subagents: running, finished and planned, with model, context, cost and time',
     })
 
-    // Ticks the running agents' clocks; quiet when nothing runs.
-    $.clock.every(1000, () => {
-      void (async () => {
-        const list = await read($, agents)
-        if (!list.some(a => a.status === 'running')) return
-        const at = await $.clock.now()
-        await update($, now, () => at)
-      })()
-    })
+    // A reload drops the old ticker with the old module: start again for runs still at work.
+    if ((await read($, agents)).some(a => a.status === 'running')) startTicker($)
     return started
   })
 
@@ -822,10 +848,10 @@ export const register: Register = (on, options) => {
     const prev = await read($, flow)
     if (isNewFlow(prev, input) && input.title !== undefined) {
       // A new flow starts with a clean list; agents still running stay.
-      await update($, agents, list => list.filter(a => a.status === 'running'))
+      await patchAgents($, list => list.filter(a => a.status === 'running'))
     }
     const at = await $.clock.now()
-    const next = await update($, flow, p => {
+    const next = await patchFlow($, p => {
       const merged = merge(p, input)
       return merged.isFinished ? { ...merged, finishedAt: at } : merged
     })
@@ -839,7 +865,7 @@ export const register: Register = (on, options) => {
     const input = e as unknown as { done?: number; total?: number; note?: string }
     const agentId = e.agentId
     if (!agentId) return { result: 'ignored: only subagents report steps' }
-    await update($, agents, list =>
+    await patchAgents($, list =>
       list.map(a => {
         if (a.agentId !== agentId) return a
         const total = Math.max(0, Math.round(input.total ?? a.stepTotal ?? 0))
@@ -876,8 +902,9 @@ export const register: Register = (on, options) => {
       return [...list.filter(a => a.id !== run.id), run].slice(-200)
     })
     await update($, now, () => at)
+    startTicker($)
     // A run started under a flow still planning moves it to delegating.
-    await update($, flow, prev => (prev && !prev.isFinished && prev.phase === 'plan' ? { ...prev, phase: 'delegate' } : prev))
+    await patchFlow($, prev => (prev && !prev.isFinished && prev.phase === 'plan' ? { ...prev, phase: 'delegate' } : prev))
     // Any subagent opens the panel: once per reported flow, else once per busy spell
     // (a run started while none was running), so closing it sticks until the next one.
     const f = await read($, flow)
@@ -894,7 +921,7 @@ export const register: Register = (on, options) => {
     if (!agentId || !usage) return result
 
     const model = usage.model || e.model
-    await update($, agents, list =>
+    await patchAgents($, list =>
       list.map(a =>
         a.agentId !== agentId
           ? a
@@ -921,6 +948,8 @@ export const register: Register = (on, options) => {
             },
       ),
     )
+    // A run resumed after it answered is at work again.
+    startTicker($)
     return result
   })
 
@@ -928,7 +957,7 @@ export const register: Register = (on, options) => {
     const agentId = e.agentId
     if (agentId) {
       const at = await $.clock.now()
-      await update($, agents, list =>
+      const list = await patchAgents($, list =>
         list.map(a => {
           if (a.agentId !== agentId) return a
           // A run whose steps went unseen still gets the turn's own sum.
@@ -951,7 +980,7 @@ export const register: Register = (on, options) => {
           }
         }),
       )
-      await update($, now, () => at)
+      if (list.some(a => a.agentId === agentId)) await update($, now, () => at)
     }
     return next(e)
   })
@@ -1146,7 +1175,7 @@ export const register: Register = (on, options) => {
         label="✕"
         plain
         role="dismiss"
-        onPress={() => update($, flow, () => null)}
+        onPress={() => patchFlow($, () => null)}
       />
     )
 
