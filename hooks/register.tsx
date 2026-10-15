@@ -661,11 +661,13 @@ const progressOf = (a: AgentRun): number | null => {
   return null
 }
 
-// The task's own percentage, for a run that reports its steps.
-const stepsOf = (a: AgentRun, sep: string): string =>
-  a.stepTotal
-    ? `${Math.round((progressOf(a) ?? 0) * 100)}% · ${a.stepDone ?? 0}/${a.stepTotal}${a.stepNote ? sep + a.stepNote : ''}`
-    : ''
+// The task's own percentage, for a run that reports its steps. A run that answered is
+// full, though it may answer before reporting its last step; a failed one keeps its count.
+const stepsOf = (a: AgentRun, sep: string): string => {
+  if (!a.stepTotal) return ''
+  const done = a.status === 'done' ? a.stepTotal : (a.stepDone ?? 0)
+  return `${Math.round((progressOf(a) ?? 0) * 100)}% · ${done}/${a.stepTotal}${a.stepNote ? sep + a.stepNote : ''}`
+}
 
 const ctxOf = (a: AgentRun): number => (a.contextMax ? Math.min(100, Math.round((a.contextTokens / a.contextMax) * 100)) : 0)
 
@@ -954,16 +956,31 @@ export const register: Register = (on, options) => {
   })
 
   on('agent.spawn', async ($, e, next) => {
-    const started = await next({ ...e, prompt: briefed(e.prompt, options.stepBrief !== 'off') })
+    // A resume (a parent woken when its background child answers, say) continues a run
+    // already listed: its prompt is the waking message, which the engine keeps as sent.
+    const isResume = e.resume !== undefined
+    const started = await next(isResume ? e : { ...e, prompt: briefed(e.prompt, options.stepBrief !== 'off') })
     if (started.deny !== undefined) return started
 
     const at = await $.clock.now()
-    const wasIdle = !(await read($, agents)).some(a => a.status === 'running')
-    await update($, agents, list => {
-      const round = 1 + list.filter(a => norm(a.description) === norm(e.description) && e.description).length
+    const id = started.agentId ?? e.resume?.agentId ?? e.tool_use_id
+    const list = await read($, agents)
+    const wasIdle = !list.some(a => a.status === 'running')
+    const held = list.find(a => a.id === id)
+    if (isResume && held) {
+      // The same run at work again: its start, totals, steps and round stay.
+      await update($, agents, all =>
+        all.map(a => (a.id === id ? { ...a, model: started.model || a.model, status: 'running', endedAt: undefined } : a)),
+      )
+      await update($, now, () => at)
+      startTicker($)
+      return started
+    }
+    await update($, agents, all => {
+      const round = 1 + all.filter(a => a.id !== id && e.description && norm(a.description) === norm(e.description)).length
       const run: AgentRun = {
-        id: started.agentId ?? e.tool_use_id,
-        agentId: started.agentId,
+        id,
+        agentId: started.agentId ?? e.resume?.agentId,
         type: e.subagentType,
         description: e.description,
         ...(e.parentAgentId ? { parentId: e.parentAgentId } : {}),
@@ -977,7 +994,7 @@ export const register: Register = (on, options) => {
         steps: 0,
         round,
       }
-      return [...list.filter(a => a.id !== run.id), run].slice(-200)
+      return [...all.filter(a => a.id !== run.id), run].slice(-200)
     })
     await update($, now, () => at)
     startTicker($)
@@ -987,7 +1004,7 @@ export const register: Register = (on, options) => {
     // (a run started while none was running), so closing it sticks until the next one.
     const f = await read($, flow)
     if (f && !f.isFinished) await autoOpen($, f.title)
-    else if (wasIdle) await autoOpen($, `run:${started.agentId ?? e.tool_use_id}`)
+    else if (wasIdle) await autoOpen($, `run:${id}`)
     return started
   })
 

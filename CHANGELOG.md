@@ -2,6 +2,13 @@
 
 All notable changes to agents-progress. The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); see *Versioning* in the README.
 
+## [Unreleased]
+
+### Fixed
+
+- A resumed run (a parent woken when its background child answers) kept its row but read as a new one: `round 2`, its clock, tokens, cost and steps started over, and its waking message got the step brief again. It now carries on in its row as it was, and its prompt goes as sent.
+- A run that answered before reporting its last step read `100% · 2/3`: it now reads `100% · 3/3`. A failed run keeps the count it reached.
+
 ## [1.1.0] - 2026-10-14
 
 ### Added

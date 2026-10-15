@@ -36,3 +36,46 @@ test('an auto-open that fails is tried again by the next run', async ($, on) => 
   await $.agent.spawn(spawn('3') as never)
   expect(calls).toBe(2)
 })
+
+test('a resumed run carries on in its own row: same start, totals, steps and round, its prompt as sent', async ($, on) => {
+  const clock = mock.clock(on, { now: 1000 })
+  const prompts: string[] = []
+  on('ui.open', async () => ({ value: { isPlaced: true } }))
+  on('agent.spawn', async (_$, e) => {
+    prompts.push(e.prompt)
+    return { model: 'claude-haiku-5-5', agentId: e.resume?.agentId ?? `a-${e.description}` }
+  })
+  on('turn.complete', async (_$, e) => ({ text: e.answer ?? '' }) as never)
+
+  await $.agent.spawn(spawn('1') as never)
+  await $.tool.call({ tool: 'mcp__agents-progress__step', done: 2, total: 4, agentId: 'a-task 1' } as never)
+  await $.turn.complete({ agentId: 'a-task 1', reason: 'answer', answer: 'ok' } as never)
+  await clock.advance(5000)
+  await $.agent.spawn({ ...spawn('1'), prompt: 'your child answered', resume: { agentId: 'a-task 1' } } as never)
+
+  expect(prompts[1]).toBe('your child answered')
+  const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
+  expect(await ui.findAll({ type: 'Text', text: /^task 1$/ })).toHaveLength(1)
+  expect(await ui.find({ type: 'Text', text: /round/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: / 50% · 2\/4$/ })).toBeDefined()
+  // Timed from its first start, five seconds ago, and at work again.
+  expect(await ui.find({ type: 'Text', text: / 0:05$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'Running · 1' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a run that answers before its last step reads full; a failed one keeps its count', async ($, on) => {
+  mock.clock(on, { now: 1000 })
+  engine(on)
+  for (const id of ['1', '2']) {
+    await $.agent.spawn(spawn(id) as never)
+    await $.tool.call({ tool: 'mcp__agents-progress__step', done: 2, total: 3, note: 'grep', agentId: `a-task ${id}` } as never)
+  }
+  await $.turn.complete({ agentId: 'a-task 1', reason: 'answer', answer: 'ok' } as never)
+  await $.turn.complete({ agentId: 'a-task 2', reason: 'error' } as never)
+
+  const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
+  expect(await ui.findAll({ type: 'Text', text: / 100% · 3\/3 · grep$/ })).toHaveLength(1)
+  expect(await ui.findAll({ type: 'Text', text: / 67% · 2\/3 · grep$/ })).toHaveLength(1)
+  await ui.unmount()
+})
