@@ -2,6 +2,25 @@
 
 All notable changes to agents-progress. The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); see *Versioning* in the README.
 
+## [Unreleased]
+
+### Added
+
+- Pressing a run in the pane puts its transcript in the main view (`$.ui.view`, Claude Code 2.1.300), and on the run in view brings the main conversation back; a `↩ Main conversation` button (`m`) shows while a run is in view, and the run in view is marked. A refused view says why in a toast.
+- A run another subagent started is drawn right under it, indented (`AgentRun.parentId`).
+- Hotkeys for the pane's toggles while it is focused: `c` collapse, `f` finished, `e` earlier.
+- `Esc` closes the pane, from the pane or from an idle, empty prompt.
+- The `progress` and `step` calls draw no row in the transcript, as the band and the pane already show what they report; a call that failed still shows.
+
+### Changed
+
+- On the terminal a run's bar row holds the bar and the task's steps, and its context, tokens, cost and time take the row below, so a step's note no longer cuts them. The desktop row is unchanged.
+- On the desktop each run's drawing leaves room beside it for its `View` button.
+
+### Fixed
+
+- `/agents-info` said `closed` and drew nothing when the pane had opened by itself on a terminal too narrow to draw it, or sat behind another pane's tab: it closes only a pane in sight, and opens any other.
+
 ## [1.0.1] - 2026-10-14
 
 ### Changed

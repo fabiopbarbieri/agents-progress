@@ -29,6 +29,7 @@ async function patchAgents($: EngineInterface, change: (list: AgentRun[]) => Age
 const TOOL = 'mcp__agents-progress__progress'
 const STEP_TOOL = 'mcp__agents-progress__step'
 const PANE = 'agents-progress'
+const QUIET_TOOLS = new Set([TOOL, STEP_TOOL])
 const PHASES: readonly Phase[] = ['plan', 'design', 'delegate', 'review', 'close']
 // How long a finished flow's band stays before it steps aside by itself.
 const FINISHED_LINGER_MS = 10_000
@@ -81,6 +82,9 @@ const STRINGS = {
     review: 'Review',
     busy: 'Tasks running',
     flow: 'Progress',
+    view: 'View',
+    main: 'Main conversation',
+    inView: 'in view',
   },
   pt: {
     pane: 'Agentes',
@@ -112,6 +116,9 @@ const STRINGS = {
     review: 'Revisão',
     busy: 'Tarefas em execução',
     flow: 'Progresso',
+    view: 'Ver',
+    main: 'Conversa principal',
+    inView: 'em vista',
   },
   ru: {
     pane: 'Агенты',
@@ -143,6 +150,9 @@ const STRINGS = {
     review: 'Ревью',
     busy: 'Задачи в работе',
     flow: 'Прогресс',
+    view: 'Открыть',
+    main: 'Основной диалог',
+    inView: 'открыт',
   },
 } as const
 
@@ -659,8 +669,13 @@ const stepsOf = (a: AgentRun, sep: string): string =>
 
 const ctxOf = (a: AgentRun): number => (a.contextMax ? Math.min(100, Math.round((a.contextTokens / a.contextMax) * 100)) : 0)
 
-const agentSvg = (W: number, a: AgentRun, at: number): string => {
+// A run another subagent started sits under it, this many pixels in per level.
+const INDENT = 16
+
+const agentSvg = (full: number, a: AgentRun, at: number, depth = 0, isViewed = false): string => {
   const s = tr()
+  const ind = Math.min(depth, MAX_DEPTH) * INDENT
+  const W = full - ind
   const tier = tierOfRun(a)
   const color = colorOf(tier)
   const ctx = ctxOf(a)
@@ -675,17 +690,20 @@ const agentSvg = (W: number, a: AgentRun, at: number): string => {
   const stepsW = Math.max(0, barW - textWidth(stats, 11) - 12)
   // Without reported steps the bar falls back to the context, drawn grey.
   const fillW = Math.round(barW * (progress ?? ctx / 100))
+  // The run in the main view sits on a tile; a nested one hangs from an elbow.
+  const tile = isViewed ? `<rect class="tile" x="-4" y="1" width="${W + 4}" height="63" rx="8"/>` : ''
+  const elbow = ind ? `<path class="ln" d="M${ind - 10} 0v24h6" fill="none"/>` : ''
   return svg(
-    W,
+    full,
     66,
-    `${crab(0, 14, costumeOf(a), false, a.status === 'running')}
+    `${elbow}<g transform="translate(${ind},0)">${tile}${crab(0, 14, costumeOf(a), false, a.status === 'running')}
 <text class="t" x="42" y="18" font-family="${FONT}" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>
 <text x="42" y="34" font-family="${FONT}" font-size="11"><tspan fill="${color}">${xml(tier === 'other' ? a.type : tier)}</tspan><tspan class="s">  ${xml(meta.join('  ·  '))}</tspan></text>
 ${steps && stepsW > 30 ? `<text class="t" x="42" y="49" font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${xml(fitText(steps, 11, stepsW))}</text>` : ''}
 <text class="s" x="${42 + barW}" y="49" text-anchor="end" font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${stats}</text>
 <rect class="k" x="42" y="55" width="${barW}" height="4" rx="2"/><rect${progress === null ? ' class="m"' : ''} x="42" y="55" width="${fillW}" height="4" rx="2"${progress === null ? '' : ` fill="${color}"`}/>
 ${statusMark(W - 8, 16, a.status, color)}
-<line class="ln" x1="0" y1="65.5" x2="${W}" y2="65.5"/>`,
+<line class="ln" x1="0" y1="65.5" x2="${W}" y2="65.5"/></g>`,
   )
 }
 
@@ -737,18 +755,48 @@ const ctxBar = (pct: number, width: number): string => {
 // The pane draws the latest finished runs; the totals still count every run.
 const FINISHED_SHOWN = 10
 
+// CSS pixels the desktop keeps beside each run's drawing for its transcript button.
+const VIEW_W = 72
+
+// How deep the pane indents a run started by another subagent; deeper ones stay at it.
+const MAX_DEPTH = 3
+
+type Nested = { a: AgentRun; depth: number }
+
+// Each run followed by the runs it started, a level deeper, when they share its
+// section; one whose parent is drawn elsewhere, or not at all, starts a tree of its own.
+const nest = (rows: AgentRun[]): Nested[] => {
+  const ids = new Set(rows.map(a => a.agentId).filter(Boolean))
+  const out: Nested[] = []
+  const seen = new Set<AgentRun>()
+  const walk = (a: AgentRun, depth: number): void => {
+    if (seen.has(a)) return
+    seen.add(a)
+    out.push({ a, depth })
+    for (const c of rows) if (c.parentId && c.parentId === a.agentId) walk(c, depth + 1)
+  }
+  for (const a of rows) if (!a.parentId || !ids.has(a.parentId)) walk(a, 0)
+  for (const a of rows) walk(a, 0)
+  return out
+}
+
 const STATUS_GLYPH: Record<string, string> = { running: '●', done: '✓', failed: '✗', planned: '◷' }
 
+// Escape closes it, from the pane or an idle, empty prompt; over a turn or text it stays the person's.
+const PANE_OPEN = () => ({ id: PANE, title: tr().pane, closeOnEscape: true }) as const
+
 // Opens the agents pane, or closes it when it is up; true when it ends up open.
+// Up means drawn and in front: one opened unasked on a narrow terminal waits undrawn,
+// and one behind another pane's tab is out of sight, so the person's ask opens those.
 async function togglePane($: EngineInterface): Promise<boolean> {
-  const isOpen = (await $.ui.panes()).some(p => p.id === PANE)
-  if (isOpen) {
+  const mine = (await $.ui.panes()).find(p => p.id === PANE)
+  if (mine?.isPlaced && mine.isShown) {
     await $.ui.close({ id: PANE })
     return false
   }
   const at = await $.clock.now()
   await update($, now, () => at)
-  await $.ui.open({ id: PANE, title: tr().pane })
+  await $.ui.open(PANE_OPEN())
   return true
 }
 
@@ -758,7 +806,7 @@ async function autoOpen($: EngineInterface, key: string): Promise<void> {
   const p = await read($, panel)
   if (p.autoOpenedFor === key) return
   void $.ui
-    .open({ id: PANE, title: tr().pane })
+    .open(PANE_OPEN())
     .then(() => update($, panel, prev => ({ ...prev, autoOpenedFor: key })))
     .catch(() => {})
 }
@@ -918,6 +966,7 @@ export const register: Register = (on, options) => {
         agentId: started.agentId,
         type: e.subagentType,
         description: e.description,
+        ...(e.parentAgentId ? { parentId: e.parentAgentId } : {}),
         model: started.model,
         status: 'running',
         startedAt: at,
@@ -1025,7 +1074,10 @@ export const register: Register = (on, options) => {
 
     const running = list.filter(a => a.status === 'running').reverse()
     const finished = list.filter(a => a.status !== 'running').reverse()
-    const shownDone = p.isDoneCollapsed ? [] : p.isEarlierShown ? finished : finished.slice(0, FINISHED_SHOWN)
+    const shownDone = nest(p.isDoneCollapsed ? [] : p.isEarlierShown ? finished : finished.slice(0, FINISHED_SHOWN))
+    const shownRunning = nest(running)
+    // The agent whose transcript is in the main view, if any.
+    const viewed = e.props.view?.agentId
     const earlier = p.isDoneCollapsed ? 0 : finished.length - finished.slice(0, FINISHED_SHOWN).length
     const planned = plannedOf(f, list)
     const t = totals(list, at)
@@ -1037,6 +1089,7 @@ export const register: Register = (on, options) => {
         key="compact"
         label={p.isCompact ? s.expand : s.collapse}
         plain
+        hotkey="c"
         onPress={() => update($, panel, prev => ({ ...prev, isCompact: !prev.isCompact }))}
       />
     )
@@ -1045,6 +1098,7 @@ export const register: Register = (on, options) => {
         key="done"
         label={`${p.isDoneCollapsed ? '▸' : '▾'} ${s.finished} · ${finished.length}`}
         plain
+        hotkey="f"
         onPress={() => update($, panel, prev => ({ ...prev, isDoneCollapsed: !prev.isDoneCollapsed }))}
       />
     )
@@ -1055,9 +1109,18 @@ export const register: Register = (on, options) => {
           key="earlier"
           label={p.isEarlierShown ? `▴ ${s.fewer}` : `+${earlier} ${s.earlier}`}
           plain
+          hotkey="e"
           onPress={() => update($, panel, prev => ({ ...prev, isEarlierShown: !prev.isEarlierShown }))}
         />
       ) : null
+    // A press puts the run's transcript in the main view, or, on the run in view, the
+    // main conversation back; a run the tasks list no longer holds says why not.
+    const show = (agentId?: string) => () => {
+      void $.ui.view(agentId ? { agentId } : {}).then(shown => {
+        if (shown.deny) $.ui.toast(shown.deny)
+      })
+    }
+    const toMain = viewed ? <Button key="main" label={`↩ ${s.main}`} plain hotkey="m" onPress={show()} /> : null
     const isEmpty = list.length === 0 && planned.length === 0
     const summary = `≈${fmtCost(t.cost)}, ${fmtTokens(t.tokens)} ${s.tokensWord}, ${fmtTime(t.time)}`
 
@@ -1069,6 +1132,24 @@ export const register: Register = (on, options) => {
           {text}
         </Text>
       )
+      // The drawing leaves room beside it for the button that opens the run's transcript.
+      const rowW = W - VIEW_W
+      const agentRow = ({ a, depth }: Nested, state: string) => {
+        const isViewed = !!a.agentId && a.agentId === viewed
+        return (
+          <Box key={a.id} flexDirection="row" alignItems="center" gap={1}>
+            <Svg
+              source={agentSvg(rowW, a, at, depth, isViewed)}
+              alt={`${a.description}: ${modelName(a.model)}, ${state}${isViewed ? `, ${s.inView}` : ''}`}
+              width={rowW}
+              height={66}
+            />
+            {a.agentId ? (
+              <Button key={`view-${a.id}`} label={isViewed ? '↩' : s.view} plain onPress={show(isViewed ? undefined : a.agentId)} />
+            ) : null}
+          </Box>
+        )
+      }
 
       if (p.isCompact) {
         return (
@@ -1082,15 +1163,12 @@ export const register: Register = (on, options) => {
         <Box flexDirection="column">
           <Svg source={headerSvg(W, title, t)} alt={title ? `${title}: ${summary}` : summary} width={W} height={headerHeight(title)} />
           {toggleCompact}
+          {toMain}
           {isEmpty && <Text dimColor>{s.empty}</Text>}
           {running.length > 0 && section('h-run', `${s.running} · ${running.length}`)}
-          {running.map(a => (
-            <Svg key={a.id} source={agentSvg(W, a, at)} alt={`${a.description}: ${modelName(a.model)}, ${s.isRunning}`} width={W} height={66} />
-          ))}
+          {shownRunning.map(n => agentRow(n, s.isRunning))}
           {finished.length > 0 && toggleDone}
-          {shownDone.map(a => (
-            <Svg key={a.id} source={agentSvg(W, a, at)} alt={`${a.description}: ${modelName(a.model)}, ${s.isFinished}`} width={W} height={66} />
-          ))}
+          {shownDone.map(n => agentRow(n, s.isFinished))}
           {toggleEarlier}
           {planned.length > 0 && section('h-plan', `${s.planned} · ${planned.length}`)}
           {planned.map(pl => (
@@ -1103,20 +1181,31 @@ export const register: Register = (on, options) => {
     // Terminal: the same content in text rows.
     const cols = Math.max(24, e.props.bodyColumns || 40)
     const barW = Math.max(6, Math.min(20, cols - 34))
-    const row = (a: AgentRun) => {
+    const row = ({ a, depth }: Nested) => {
+      const isViewed = !!a.agentId && a.agentId === viewed
       const tier = tierOfRun(a)
       const color = colorOf(tier)
       const ctx = ctxOf(a)
       const progress = progressOf(a)
       const model = a.effort ? `${modelName(a.model)} · ${a.effort}` : modelName(a.model)
-      const steps = a.stepTotal ? `${stepsOf(a, ' ')} · ` : ''
+      // The bar and the task's own steps on one row, the run's numbers on the next:
+      // one row held both, and a step's note truncated them.
+      const steps = stepsOf(a, ' · ')
       return (
-        <Box key={a.id} flexDirection="column" marginBottom={1}>
+        <Box key={a.id} flexDirection="column" marginBottom={1} paddingLeft={2 * Math.min(depth, MAX_DEPTH)}>
           <Box flexDirection="row" gap={1}>
-            <Text color={color}>▣</Text>
-            <Text bold wrap="truncate-end">
-              {a.description || a.type}
-            </Text>
+            <Text color={color}>{isViewed ? '▶' : depth ? '↳' : '▣'}</Text>
+            {a.agentId ? (
+              <Button key={`view-${a.id}`} plain onPress={show(isViewed ? undefined : a.agentId)}>
+                <Text bold color={isViewed ? ACCENT : undefined} wrap="truncate-end">
+                  {a.description || a.type}
+                </Text>
+              </Button>
+            ) : (
+              <Text bold wrap="truncate-end">
+                {a.description || a.type}
+              </Text>
+            )}
             <Text color={a.status === 'failed' ? 'red' : a.status === 'done' ? 'green' : color}>{STATUS_GLYPH[a.status]}</Text>
           </Box>
           <Text dimColor wrap="truncate-end">
@@ -1127,10 +1216,10 @@ export const register: Register = (on, options) => {
           <Text wrap="truncate-end">
             {'  '}
             {progress === null ? <Text dimColor>{ctxBar(ctx, barW)}</Text> : <Text color={color}>{ctxBar(progress * 100, barW)}</Text>}
-            <Text dimColor>
-              {' '}
-              {steps}ctx {ctx}% · {fmtTokens(a.contextTokens)} ≈{fmtCost(a.costUsd)} {fmtTime(elapsed(a, at))}
-            </Text>
+            {steps ? ` ${steps}` : ''}
+          </Text>
+          <Text dimColor wrap="truncate-end">
+            {'  '}ctx {ctx}% · {fmtTokens(a.contextTokens)} · ≈{fmtCost(a.costUsd)} · {fmtTime(elapsed(a, at))}
           </Text>
         </Box>
       )
@@ -1144,6 +1233,7 @@ export const register: Register = (on, options) => {
           </Text>
           {toggleCompact}
         </Box>
+        {toMain}
         <Text dimColor>
           ≈{fmtCost(t.cost)} · {fmtTokens(t.tokens)} {s.tokensWord} · {fmtTime(t.time)}
         </Text>
@@ -1164,7 +1254,7 @@ export const register: Register = (on, options) => {
           <Box flexDirection="column" marginTop={1}>
             {isEmpty && <Text dimColor>{s.empty}</Text>}
             {running.length > 0 && <Text dimColor>{s.running} · {running.length}</Text>}
-            {running.map(row)}
+            {shownRunning.map(row)}
             {finished.length > 0 && toggleDone}
             {shownDone.map(row)}
             {toggleEarlier}
@@ -1188,6 +1278,20 @@ export const register: Register = (on, options) => {
         )}
       </Box>
     )
+  })
+
+  // The band and the pane already show what these calls report: their rows in the
+  // transcript draw nothing, unless the call failed.
+  on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
+    if (!QUIET_TOOLS.has(e.props.tool) || e.props.isErrored) return next(e)
+    const { Box } = $.ui.resolve(e)
+    return <Box />
+  })
+
+  on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
+    if (!QUIET_TOOLS.has(e.props.tool) || e.props.isErrored) return next(e)
+    const { Box } = $.ui.resolve(e)
+    return <Box />
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {

@@ -12,11 +12,12 @@ export const spawn = (id: string, type = 'general-purpose') => ({
 
 // The engine beneath the plugin: panes always place, each run gets `a-<description>`
 // on the model `models` names for it (Sonnet otherwise), a turn answers, and the
-// band beneath is blank unless `below` draws one.
-export const engine = (on: On, models: Record<string, string> = {}, below?: string): string[] => {
+// band beneath is blank unless `below` draws one. `opens`, given, gets each open's whole argument.
+export const engine = (on: On, models: Record<string, string> = {}, below?: string, opens?: unknown[]): string[] => {
   const opened: string[] = []
   on('ui.open', async (_$, e) => {
     opened.push(e.id)
+    opens?.push(e)
     return { value: { isPlaced: true } }
   })
   on('agent.spawn', async (_$, e) => ({ model: models[e.description] ?? 'claude-sonnet-5-5', agentId: `a-${e.description}` }))
@@ -45,5 +46,5 @@ export const BAND = { component: 'AbovePrompt', props: { hasSurvey: false, isWor
 export const PANE = {
   component: 'Pane',
   requestId: 'agents-progress',
-  props: { title: 'Agents', isFocused: false, bodyColumns: 80, placement: 'dock', scroll: undefined as never },
+  props: { title: 'Agents', isFocused: false, bodyColumns: 80, placement: 'dock', scroll: undefined as never, view: {} as { agentId?: string } },
 } as const

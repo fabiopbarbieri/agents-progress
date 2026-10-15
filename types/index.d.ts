@@ -37,6 +37,8 @@ export type AgentRun = {
   costUsd: number
   steps: number
   round: number
+  /** The agentId of the subagent that started this one; absent when the main loop did. */
+  parentId?: string
   /** Self-reported by the worker through the `step` tool. */
   stepDone?: number
   stepTotal?: number

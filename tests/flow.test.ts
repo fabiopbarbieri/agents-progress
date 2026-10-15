@@ -76,11 +76,11 @@ test("a worker's steps draw its own bar; a call from outside a subagent is ignor
   expect(await $.tool.call(step({ done: 9, agentId: 'a-task 1' }))).toEqual({ result: 'ok' })
 
   const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
-  expect(await ui.find({ type: 'Text', text: /5\/5 · ctx/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: / 100% · 5\/5$/ })).toBeDefined()
   await ui.unmount()
 })
 
-test("a run that reports steps shows its task's percentage on both surfaces", async ($, on) => {
+test("a run that reports steps shows its task's percentage on both surfaces, the terminal's numbers a row below", async ($, on) => {
   mock.clock(on, { now: 1000 })
   engine(on)
   await $.agent.spawn(spawn('1') as never)
@@ -88,11 +88,14 @@ test("a run that reports steps shows its task's percentage on both surfaces", as
   await $.tool.call(step({ done: 2, total: 5, note: 'reading', agentId: 'a-task 1' }))
 
   const term = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
-  expect(await term.find({ type: 'Text', text: /40% · 2\/5 reading · ctx/ })).toBeDefined()
+  expect(await term.find({ type: 'Text', text: / 40% · 2\/5 · reading$/ })).toBeDefined()
+  // The run's own numbers take the next row, so a long note cuts neither.
+  expect(await term.find({ type: 'Text', text: /^ {2}ctx \d+% · \d+ · ≈\$0\.00 · 0:00$/ })).toBeDefined()
+  expect(await term.find({ type: 'Text', text: /2\/5.*ctx/ })).toBeUndefined()
   // A run that reports nothing keeps its context share alone.
   const percents = await term.findAll({ type: 'Text', text: /\d+% · \d+\/\d+/ })
   expect(percents.length).toBeGreaterThan(0)
-  expect(percents.every(t => t.text.includes('2/5 reading'))).toBe(true)
+  expect(percents.every(t => t.text.includes('2/5 · reading'))).toBe(true)
   await term.unmount()
 
   const desk = await $.ui.mount({ plugin: 'agents-progress', surface: 'desktop', ...PANE })
@@ -120,7 +123,7 @@ test("each model request adds the run's tokens and estimated cost", async ($, on
 
   const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
   // Sonnet: 1000×2 + 500×10 + 20000×0.2 + 3000×2.5 per million = $0.0185 a request.
-  expect(await ui.find({ type: 'Text', text: /ctx 2% · 25k ≈\$0\.04/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /ctx 2% · 25k · ≈\$0\.04/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /≈\$0\.04 · 49k tokens/ })).toBeDefined()
   await ui.unmount()
 })
