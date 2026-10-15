@@ -130,3 +130,23 @@ test('/agents-info opens a pane that waits undrawn or sits behind a tab, and clo
   expect(closed).toEqual(['agents-progress'])
   expect(opens).toHaveLength(2)
 })
+
+test('an engine before $.ui.view draws no View press, the row taking its room', { options: { language: 'en' } }, async ($, on) => {
+  mock.clock(on, { now: 1000 })
+  engine(on)
+  on('session.version', async () => ({ value: { version: '2.1.295', base: '2.1.295' } }) as never)
+  on('session.start', async (_$, e) => ({ cwd: e.cwd }))
+  await $.session.start({ cwd: '/tmp', surface: 'desktop', isInteractive: true } as never)
+  await $.agent.spawn(spawn('1') as never)
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'agents-progress', surface, ...viewing('a-task 1') })
+    expect(await ui.find({ type: 'Button', key: 'view-a-task 1' })).toBeUndefined()
+    expect(await ui.find({ type: 'Button', key: 'main' })).toBeUndefined()
+    await ui.unmount()
+  }
+  const desk = await $.ui.mount({ plugin: 'agents-progress', surface: 'desktop', ...viewing() })
+  const row = (await desk.findAll({ type: 'Svg' })).find(s => String(s.props.alt).startsWith('task 1:'))
+  expect(row?.props.width).toBe(632)
+  await desk.unmount()
+})

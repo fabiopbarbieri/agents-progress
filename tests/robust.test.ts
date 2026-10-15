@@ -79,3 +79,24 @@ test('a run that answers before its last step reads full; a failed one keeps its
   expect(await ui.findAll({ type: 'Text', text: / 67% · 2\/3 · grep$/ })).toHaveLength(1)
   await ui.unmount()
 })
+
+test('the totals time the runs at work, not the idle spell between them', async ($, on) => {
+  const clock = mock.clock(on, { now: 1000 })
+  engine(on)
+  await $.agent.spawn(spawn('1') as never)
+  await clock.advance(2000)
+  await $.turn.complete({ agentId: 'a-task 1', reason: 'answer', answer: 'ok' } as never)
+  await clock.advance(60000)
+  await $.agent.spawn(spawn('2') as never)
+  await $.agent.spawn(spawn('3') as never)
+  await clock.advance(3000)
+  for (const id of ['2', '3']) await $.turn.complete({ agentId: `a-task ${id}`, reason: 'answer', answer: 'ok' } as never)
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'agents-progress', surface, ...PANE })
+    const texts = [...(await ui.findAll({ type: 'Text' })), ...(await ui.findAll({ type: 'Svg' }))].map(n => JSON.stringify(n))
+    expect(texts.some(t => t.includes('0:05'))).toBe(true)
+    expect(texts.some(t => t.includes('1:05'))).toBe(false)
+    await ui.unmount()
+  }
+})

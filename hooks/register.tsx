@@ -158,6 +158,24 @@ const STRINGS = {
 
 // Module scope is fine here: session.start sets it again on every (re)load.
 let lang: Lang = 'en'
+// $.ui.view came with Claude Code 2.1.300; the desktop app runs its own engine, which
+// may lag. Set in session.start, as lang is.
+let canView = true
+
+const VIEW_SINCE = [2, 1, 300]
+
+async function engineHasView($: EngineInterface): Promise<boolean> {
+  try {
+    const { base, version } = await $.session.version()
+    const parts = (base ?? version).split(/[.-]/).slice(0, 3).map(Number)
+    // A version not spelled as a release is a build of its own: assume it has the call.
+    if (parts.length < 3 || parts.some(isNaN)) return true
+    for (const [i, since] of VIEW_SINCE.entries()) if (parts[i] !== since) return parts[i]! > since
+    return true
+  } catch {
+    return false
+  }
+}
 const tr = () => STRINGS[lang]
 
 const langOf = (v: unknown): Lang => {
@@ -470,12 +488,24 @@ const plannedOf = (f: Flow | null, list: AgentRun[]): Planned[] => {
   return (f.tasks ?? []).map((t, i) => ({ ...t, n: i + 1 })).filter(t => !started.has(norm(t.title)))
 }
 
+// The time some run was at work: runs side by side count once, and the idle spells
+// between them (the session keeps its runs across flows) not at all.
+const busyTime = (list: AgentRun[], at: number): number => {
+  const spans = list.map(a => [a.startedAt, a.endedAt ?? Math.max(at, a.startedAt)] as const).sort((x, y) => x[0] - y[0])
+  let total = 0
+  let end = -Infinity
+  for (const [from, to] of spans) {
+    if (to <= end) continue
+    total += to - Math.max(from, end)
+    end = to
+  }
+  return total
+}
+
 const totals = (list: AgentRun[], at: number) => {
   const cost = list.reduce((s, a) => s + a.costUsd, 0)
   const tokens = list.reduce((s, a) => s + a.tokens, 0)
-  const start = Math.min(...list.map(a => a.startedAt))
-  const end = Math.max(...list.map(a => a.endedAt ?? Math.max(at, a.startedAt)))
-  return { cost, tokens, time: list.length ? end - start : 0 }
+  return { cost, tokens, time: busyTime(list, at) }
 }
 
 // --- desktop drawings: each row is one SVG, as the band above the prompt is.
@@ -853,6 +883,7 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     lang = await detectLang($, options.language)
+    canView = await engineHasView($)
     // A reload drops pending timers: a finished flow held by the host still steps aside.
     const held = await read($, flow)
     if (held?.isFinished) stepAside($, held)
@@ -1132,12 +1163,13 @@ export const register: Register = (on, options) => {
       ) : null
     // A press puts the run's transcript in the main view, or, on the run in view, the
     // main conversation back; a run the tasks list no longer holds says why not.
+    // An engine before $.ui.view draws no such press: it would do nothing and say nothing.
     const show = (agentId?: string) => () => {
       void $.ui.view(agentId ? { agentId } : {}).then(shown => {
         if (shown.deny) $.ui.toast(shown.deny)
       })
     }
-    const toMain = viewed ? <Button key="main" label={`↩ ${s.main}`} plain hotkey="m" onPress={show()} /> : null
+    const toMain = canView && viewed ? <Button key="main" label={`↩ ${s.main}`} plain hotkey="m" onPress={show()} /> : null
     const isEmpty = list.length === 0 && planned.length === 0
     const summary = `≈${fmtCost(t.cost)}, ${fmtTokens(t.tokens)} ${s.tokensWord}, ${fmtTime(t.time)}`
 
@@ -1150,7 +1182,7 @@ export const register: Register = (on, options) => {
         </Text>
       )
       // The drawing leaves room beside it for the button that opens the run's transcript.
-      const rowW = W - VIEW_W
+      const rowW = canView ? W - VIEW_W : W
       const agentRow = ({ a, depth }: Nested, state: string) => {
         const isViewed = !!a.agentId && a.agentId === viewed
         return (
@@ -1161,7 +1193,7 @@ export const register: Register = (on, options) => {
               width={rowW}
               height={66}
             />
-            {a.agentId ? (
+            {canView && a.agentId ? (
               <Button key={`view-${a.id}`} label={isViewed ? '↩' : s.view} plain onPress={show(isViewed ? undefined : a.agentId)} />
             ) : null}
           </Box>
@@ -1212,7 +1244,7 @@ export const register: Register = (on, options) => {
         <Box key={a.id} flexDirection="column" marginBottom={1} paddingLeft={2 * Math.min(depth, MAX_DEPTH)}>
           <Box flexDirection="row" gap={1}>
             <Text color={color}>{isViewed ? '▶' : depth ? '↳' : '▣'}</Text>
-            {a.agentId ? (
+            {canView && a.agentId ? (
               <Button key={`view-${a.id}`} plain onPress={show(isViewed ? undefined : a.agentId)}>
                 <Text bold color={isViewed ? ACCENT : undefined} wrap="truncate-end">
                   {a.description || a.type}

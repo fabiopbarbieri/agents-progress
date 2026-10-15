@@ -2,6 +2,13 @@
 
 All notable changes to agents-progress. The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); see *Versioning* in the README.
 
+## [Unreleased]
+
+### Fixed
+
+- On an engine before Claude Code 2.1.300, as the desktop app's own can be, a run's `View` button (the title on the terminal) did nothing and said nothing, as `$.ui.view` is not there: the pane now draws no such press, and the desktop row takes the button's room.
+- The totals' time ran from the session's first run to its last, idle spells between flows included (5:17 for a few seconds of work): it now counts the time some run was at work, runs side by side once.
+
 ## [1.1.1] - 2026-10-14
 
 ### Fixed
