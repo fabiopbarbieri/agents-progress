@@ -2,7 +2,7 @@
 
 All notable changes to agents-progress. The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); see *Versioning* in the README.
 
-## [Unreleased]
+## [1.1.0] - 2026-10-14
 
 ### Added
 
@@ -63,5 +63,6 @@ First release, forked from [savvy-progress](https://github.com/johnnyvizz/claude
 - The band's bar twinkles in four paths instead of up to ~1350 rects, and only while runs work.
 - State is written only when it changes, and the one-second ticker runs only while a run works.
 
+[1.1.0]: https://github.com/fabiopbarbieri/agents-progress/releases/tag/agents-progress--v1.1.0
 [1.0.1]: https://github.com/fabiopbarbieri/agents-progress/releases/tag/agents-progress--v1.0.1
 [1.0.0]: https://github.com/fabiopbarbieri/agents-progress/releases/tag/agents-progress--v1.0.0
