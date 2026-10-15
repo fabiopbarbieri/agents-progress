@@ -2,7 +2,7 @@
 
 All notable changes to agents-progress. The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); see *Versioning* in the README.
 
-## [Unreleased]
+## [1.1.2] - 2026-10-15
 
 ### Fixed
 
