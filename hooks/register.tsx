@@ -85,6 +85,7 @@ const STRINGS = {
     view: 'View',
     main: 'Main conversation',
     inView: 'in view',
+    gone: "This run's transcript is gone: Claude Code lets a run go about 30 seconds after it ends.",
   },
   pt: {
     pane: 'Agentes',
@@ -119,6 +120,7 @@ const STRINGS = {
     view: 'Ver',
     main: 'Conversa principal',
     inView: 'em vista',
+    gone: 'O transcript deste run não está mais disponível: o Claude Code libera um run cerca de 30 s depois que ele termina.',
   },
   ru: {
     pane: 'Агенты',
@@ -153,6 +155,7 @@ const STRINGS = {
     view: 'Открыть',
     main: 'Основной диалог',
     inView: 'открыт',
+    gone: 'Транскрипт этого запуска больше недоступен: Claude Code отпускает запуск примерно через 30 секунд после завершения.',
   },
 } as const
 
@@ -790,6 +793,20 @@ const FINISHED_SHOWN = 10
 // CSS pixels the desktop keeps beside each run's drawing for its transcript button.
 const VIEW_W = 72
 
+// Claude Code drops a finished subagent from its tasks list 30 s after it ends, and
+// $.ui.view finds only the agents still there. A redraw a little later takes the press
+// off the runs it let go.
+const RELEASED_MS = 31_000
+
+// The ids $.agent.list() still holds; null where it could not say.
+async function listedIds($: EngineInterface): Promise<Set<string> | null> {
+  try {
+    return new Set((await $.agent.list()).map(a => a.id))
+  } catch {
+    return null
+  }
+}
+
 // How deep the pane indents a run started by another subagent; deeper ones stay at it.
 const MAX_DEPTH = 3
 
@@ -1106,7 +1123,10 @@ export const register: Register = (on, options) => {
           }
         }),
       )
-      if (list.some(a => a.agentId === agentId)) await update($, now, () => at)
+      if (list.some(a => a.agentId === agentId)) {
+        await update($, now, () => at)
+        if (canView) $.clock.after(RELEASED_MS, () => $.ui.invalidate('ui.render'))
+      }
     }
     return next(e)
   })
@@ -1164,10 +1184,22 @@ export const register: Register = (on, options) => {
     // A press puts the run's transcript in the main view, or, on the run in view, the
     // main conversation back; a run the tasks list no longer holds says why not.
     // An engine before $.ui.view draws no such press: it would do nothing and say nothing.
+    // Nor does a run the tasks list let go (the run in view keeps its way back), and one
+    // let go since this drawing says so in the panel's language, not the engine's.
+    const listed = canView ? await listedIds($) : null
+    const canPress = (a: AgentRun, isViewed: boolean): a is AgentRun & { agentId: string } =>
+      canView && !!a.agentId && (isViewed || !listed || listed.has(a.agentId))
     const show = (agentId?: string) => () => {
-      void $.ui.view(agentId ? { agentId } : {}).then(shown => {
+      void (async () => {
+        const ids = agentId ? await listedIds($) : null
+        if (agentId && ids && !ids.has(agentId)) {
+          $.ui.toast(s.gone)
+          $.ui.invalidate('ui.render')
+          return
+        }
+        const shown = await $.ui.view(agentId ? { agentId } : {})
         if (shown.deny) $.ui.toast(shown.deny)
-      })
+      })()
     }
     const toMain = canView && viewed ? <Button key="main" label={`↩ ${s.main}`} plain hotkey="m" onPress={show()} /> : null
     const isEmpty = list.length === 0 && planned.length === 0
@@ -1193,7 +1225,7 @@ export const register: Register = (on, options) => {
               width={rowW}
               height={66}
             />
-            {canView && a.agentId ? (
+            {canPress(a, isViewed) ? (
               <Button key={`view-${a.id}`} label={isViewed ? '↩' : s.view} plain onPress={show(isViewed ? undefined : a.agentId)} />
             ) : null}
           </Box>
@@ -1244,7 +1276,7 @@ export const register: Register = (on, options) => {
         <Box key={a.id} flexDirection="column" marginBottom={1} paddingLeft={2 * Math.min(depth, MAX_DEPTH)}>
           <Box flexDirection="row" gap={1}>
             <Text color={color}>{isViewed ? '▶' : depth ? '↳' : '▣'}</Text>
-            {canView && a.agentId ? (
+            {canPress(a, isViewed) ? (
               <Button key={`view-${a.id}`} plain onPress={show(isViewed ? undefined : a.agentId)}>
                 <Text bold color={isViewed ? ACCENT : undefined} wrap="truncate-end">
                   {a.description || a.type}
@@ -1403,7 +1435,6 @@ export const register: Register = (on, options) => {
         <Text color={f.isFinished ? DONE : ACCENT}>{barText(f, width)}</Text>
         <Text bold>{label(f, running)}</Text>
         <Text dimColor>{percent}</Text>
-        <Text color={CLAY}>▣</Text>
         {crewButton}
         {dismiss}
       </Box>,

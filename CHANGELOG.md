@@ -2,6 +2,16 @@
 
 All notable changes to agents-progress. The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); see *Versioning* in the README.
 
+## [Unreleased]
+
+### Changed
+
+- The band no longer draws the orange `▣` before the crew button.
+
+### Fixed
+
+- Pressing a run that had ended more than about 30 seconds before said `no agent under that id`: Claude Code drops a finished subagent from its tasks list then, and `$.ui.view` finds only the ones still there. A run is pressable only while `$.agent.list()` holds it (the run in view keeps its way back), the pane redraws once the list lets a run go, and a press on a run let go in between says why in the panel's language.
+
 ## [1.1.2] - 2026-10-15
 
 ### Fixed

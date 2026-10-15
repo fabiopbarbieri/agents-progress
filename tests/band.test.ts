@@ -11,6 +11,7 @@ test('the band draws its bar as text on the terminal and as one drawing on the d
   expect(await term.find({ type: 'Text', text: 'Tasks 1/4' })).toBeDefined()
   expect(await term.find({ type: 'Text', text: /^█+░+$/ })).toBeDefined()
   expect(await term.find({ type: 'Svg' })).toBeUndefined()
+  expect(await term.find({ type: 'Text', text: '▣' })).toBeUndefined()
   await term.unmount()
 
   const desk = await $.ui.mount({ plugin: 'agents-progress', surface: 'desktop', ...BAND })

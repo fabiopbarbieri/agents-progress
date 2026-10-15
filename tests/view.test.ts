@@ -1,3 +1,4 @@
+import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 
 import { PANE, engine, spawn } from './kit'
@@ -149,4 +150,56 @@ test('an engine before $.ui.view draws no View press, the row taking its room', 
   const row = (await desk.findAll({ type: 'Svg' })).find(s => String(s.props.alt).startsWith('task 1:'))
   expect(row?.props.width).toBe(632)
   await desk.unmount()
+})
+
+// The tasks list as the engine holds it: `ids` are the agents it still lists.
+const listing = (on: On, ids: string[]) =>
+  on('agent.list', async () => ({ value: ids.map(id => ({ id, description: id, type: 'general-purpose', status: 'completed' })) }) as never)
+
+test('only a run the tasks list still holds can be pressed; the run in view keeps its way back', async ($, on) => {
+  mock.clock(on, { now: 1000 })
+  engine(on)
+  const held = ['a-task 1', 'a-task 3']
+  listing(on, held)
+  for (const id of ['1', '2', '3']) await $.agent.spawn(spawn(id) as never)
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'agents-progress', surface, ...viewing('a-task 3') })
+    expect(await ui.find({ type: 'Button', key: 'view-a-task 1' })).toBeDefined()
+    expect(await ui.find({ type: 'Button', key: 'view-a-task 2' })).toBeUndefined()
+    expect(await ui.find({ type: 'Button', key: 'view-a-task 3' })).toBeDefined()
+    await ui.unmount()
+  }
+  // Let go while in view: its way back to the main conversation stays.
+  held.splice(1, 1)
+  const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...viewing('a-task 3') })
+  expect(await ui.find({ type: 'Button', key: 'view-a-task 3' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a run let go after the drawing says so in the panel language, without asking the engine', { options: { language: 'pt' } }, async ($, on) => {
+  mock.clock(on, { now: 1000 })
+  engine(on)
+  on('session.version', async () => ({ value: { version: '2.1.300', base: '2.1.300' } }) as never)
+  on('session.start', async (_$, e) => ({ cwd: e.cwd }))
+  const held = ['a-task 1']
+  listing(on, held)
+  const asked: unknown[] = []
+  on('ui.view', async (_$, e) => {
+    asked.push(e)
+    return { value: {} } as never
+  })
+  const toasts: string[] = []
+  on('ui.toast', async (_$, e) => {
+    toasts.push((e as { text: string }).text)
+    return { value: undefined } as never
+  })
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as never)
+  await $.agent.spawn(spawn('1') as never)
+  const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...viewing() })
+  held.length = 0
+  await ui.press({ key: 'view-a-task 1' })
+  await ui.unmount()
+  expect(asked).toEqual([])
+  expect(toasts).toEqual([expect.stringMatching(/^O transcript deste run não está mais disponível/)])
 })
