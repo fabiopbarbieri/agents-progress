@@ -2,6 +2,19 @@
 
 All notable changes to agents-progress. The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); see *Versioning* in the README.
 
+## [1.2.0] - 2026-10-16
+
+### Added
+
+- A workflow run (the Workflow tool) is one row in the pane, named after the workflow: its agents answered out of started as the bar, with their summed tokens, cost and time. Its `▸` button (the title on the terminal) opens its agents beneath it, runs they started included. The band counts the run once, and the pane opens once per run. Since Claude Code 2.1.292 `agent.spawn` raises a workflow's agents, and each one showed as a loose run.
+- A run that answered and is woken again (a message to it, a teammate's turn) shows as running from the start of its new turn, not only once its first model request returns (Claude Code 2.1.299).
+
+### Changed
+
+- A workflow's agents keep the prompts their script wrote: the step brief is no longer added to them.
+- Past the 200 runs the session keeps, finished workflow agents leave before any other run.
+- From Claude Code 2.1.293, `mcp__agents-progress__step` is listed from the first prompt (`isDeferred: false`), so a subagent reports its steps without a ToolSearch round first. `progress` stays behind tool search.
+
 ## [1.1.3] - 2026-10-15
 
 ### Changed
