@@ -167,19 +167,23 @@ let lang: Lang = 'en'
 let canView = true
 
 const VIEW_SINCE = [2, 1, 300]
+// `isDeferred` on $.tool.register came with 2.1.293.
+const LISTED_SINCE = [2, 1, 293]
 
-async function engineHasView($: EngineInterface): Promise<boolean> {
+async function engineSince($: EngineInterface, release: number[]): Promise<boolean> {
   try {
     const { base, version } = await $.session.version()
     const parts = (base ?? version).split(/[.-]/).slice(0, 3).map(Number)
     // A version not spelled as a release is a build of its own: assume it has the call.
     if (parts.length < 3 || parts.some(isNaN)) return true
-    for (const [i, since] of VIEW_SINCE.entries()) if (parts[i] !== since) return parts[i]! > since
+    for (const [i, since] of release.entries()) if (parts[i] !== since) return parts[i]! > since
     return true
   } catch {
     return false
   }
 }
+
+const engineHasView = ($: EngineInterface): Promise<boolean> => engineSince($, VIEW_SINCE)
 const tr = () => STRINGS[lang]
 
 const langOf = (v: unknown): Lang => {
@@ -1056,7 +1060,11 @@ export const register: Register = (on, options) => {
         },
       },
     })
+    // Every briefed subagent calls `step` first thing: listed from the start, it needs no
+    // ToolSearch round first. `progress` stays behind tool search, loaded by the skill.
+    const listed = (await engineSince($, LISTED_SINCE)) ? { isDeferred: false } : {}
     await $.tool.register({
+      ...listed,
       name: 'step',
       description:
         'For subagents: report progress on your own task to the agents panel. ' +

@@ -15,7 +15,7 @@ A Claude Code mod, forked from [savvy-progress](https://github.com/johnnyvizz/cl
 ## Tools and skill
 
 - `mcp__agents-progress__progress`: the delegating session reports the plan, phase and accepted tasks.
-- `mcp__agents-progress__step`: a subagent reports its own steps (`done`, `total`, `note`). The mod adds a paragraph asking for it to every subagent's prompt, except a workflow's agents; a run that does not report shows its context fill in grey.
+- `mcp__agents-progress__step`: a subagent reports its own steps (`done`, `total`, `note`). From Claude Code 2.1.293 it is listed from the first prompt, so a subagent calls it without a ToolSearch first. The mod adds a paragraph asking for it to every subagent's prompt, except a workflow's agents; a run that does not report shows its context fill in grey.
 - Neither tool draws a row in the transcript, as the band and the panel show what they report; a call that failed still shows.
 - Skill `agents-progress:reportar-progresso`: Claude loads it before any delegation to report the plan and each accepted task. It is not in the `/` menu.
 

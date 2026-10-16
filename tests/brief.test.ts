@@ -29,3 +29,25 @@ test('stepBrief off leaves the prompts as written', { options: { stepBrief: 'off
   await $.agent.spawn(spawn('1') as never)
   expect(prompts).toEqual(['do it'])
 })
+
+test('step is listed from the first prompt where the engine can list it; progress stays behind tool search', async ($, on) => {
+  let release = ''
+  const specs: Record<string, unknown>[] = []
+  on('session.version', async () => ({ value: { version: release, base: release } }) as never)
+  on('settings.read', async () => ({ value: {} }) as never)
+  on('env.get', async () => ({ value: undefined }) as never)
+  on('session.start', async (_$, e) => ({ cwd: e.cwd }))
+  on('tool.register', async (_$, e) => {
+    specs.push(e as Record<string, unknown>)
+    return { value: { tool: `mcp__agents-progress__${(e as { name: string }).name}` } } as never
+  })
+  for (const [at, isListed] of [['2.1.301', true], ['2.1.292', false]] as const) {
+    release = at
+    specs.length = 0
+    await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as never)
+    const of = (name: string) => specs.find(s => s.name === name)
+    expect(of('step')).toBeDefined()
+    expect(of('step')?.isDeferred).toBe(isListed ? false : undefined)
+    expect(of('progress')?.isDeferred).toBeUndefined()
+  }
+})
