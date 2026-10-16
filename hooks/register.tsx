@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderElement, Timer } from 'claude-code'
 
-import type { AgentRun, Flow, Panel, Phase, PlannedTask } from '../types'
+import type { AgentRun, AgentStatus, Flow, Panel, Phase, PlannedTask } from '../types'
 
 const flow = atom({ plugin: 'agents-progress', key: 'flow' } as const, null)
 const agents = atom({ plugin: 'agents-progress', key: 'agents' } as const, [])
@@ -11,6 +11,7 @@ const panel = atom({ plugin: 'agents-progress', key: 'panel' } as const, {
   autoOpenedFor: '',
 })
 const now = atom({ plugin: 'agents-progress', key: 'now' } as const, 0)
+const workflows = atom({ plugin: 'agents-progress', key: 'workflows' } as const, {})
 
 // `update` writes, and so redraws every reader, even when the value stays the same:
 // these write only a change. One per value, as the engine's scan reads each by name.
@@ -715,12 +716,17 @@ const agentSvg = (full: number, a: AgentRun, at: number, depth = 0, isViewed = f
   const color = colorOf(tier)
   const ctx = ctxOf(a)
   const textW = W - 42 - 22
-  const meta = [a.effort ? `${modelName(a.model)} · ${a.effort}` : modelName(a.model)]
+  const isGroup = isGroupRow(a)
+  const meta = isGroup
+    ? [`${a.stepTotal ?? 0} ${s.agentsCount}`]
+    : [a.effort ? `${modelName(a.model)} · ${a.effort}` : modelName(a.model)]
   if (a.round > 1) meta.push(`${s.round} ${a.round}`)
   if (a.status === 'failed') meta.push(s.failed)
   const barW = textW
   const progress = progressOf(a)
-  const stats = `ctx ${ctx}% · ${fmtTokens(a.contextTokens)}  ≈${fmtCost(a.costUsd)}  ${fmtTime(elapsed(a, at))}`
+  const stats = isGroup
+    ? `${fmtTokens(a.tokens)}  ≈${fmtCost(a.costUsd)}  ${fmtTime(elapsed(a, at))}`
+    : `ctx ${ctx}% · ${fmtTokens(a.contextTokens)}  ≈${fmtCost(a.costUsd)}  ${fmtTime(elapsed(a, at))}`
   const steps = stepsOf(a, ' · ')
   const stepsW = Math.max(0, barW - textWidth(stats, 11) - 12)
   // Without reported steps the bar falls back to the context, drawn grey.
@@ -733,7 +739,7 @@ const agentSvg = (full: number, a: AgentRun, at: number, depth = 0, isViewed = f
     66,
     `${elbow}<g transform="translate(${ind},0)">${tile}${crab(0, 14, costumeOf(a), false, a.status === 'running')}
 <text class="t" x="42" y="18" font-family="${FONT}" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>
-<text x="42" y="34" font-family="${FONT}" font-size="11"><tspan fill="${color}">${xml(tier === 'other' ? a.type : tier)}</tspan><tspan class="s">  ${xml(meta.join('  ·  '))}</tspan></text>
+<text x="42" y="34" font-family="${FONT}" font-size="11"><tspan fill="${color}">${xml(isGroup || tier === 'other' ? a.type : tier)}</tspan><tspan class="s">  ${xml(meta.join('  ·  '))}</tspan></text>
 ${steps && stepsW > 30 ? `<text class="t" x="42" y="49" font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${xml(fitText(steps, 11, stepsW))}</text>` : ''}
 <text class="s" x="${42 + barW}" y="49" text-anchor="end" font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${stats}</text>
 <rect class="k" x="42" y="55" width="${barW}" height="4" rx="2"/><rect${progress === null ? ' class="m"' : ''} x="42" y="55" width="${fillW}" height="4" rx="2"${progress === null ? '' : ` fill="${color}"`}/>
@@ -827,6 +833,117 @@ const nest = (rows: AgentRun[]): Nested[] => {
   for (const a of rows) if (!a.parentId || !ids.has(a.parentId)) walk(a, 0)
   for (const a of rows) walk(a, 0)
   return out
+}
+
+// --- workflow runs: a script's agents gather under one row, opened on demand.
+
+type Group = { runId: string; rows: AgentRun[] }
+
+// How many runs the session keeps; past it, finished workflow agents go first.
+const MAX_RUNS = 200
+
+const prune = (list: AgentRun[]): AgentRun[] => {
+  const extra = list.length - MAX_RUNS
+  if (extra <= 0) return list
+  const drop = new Set(list.filter(a => a.workflow && a.status !== 'running').slice(0, extra))
+  return list.filter(a => !drop.has(a)).slice(-MAX_RUNS)
+}
+
+// The workflow run a row belongs to: its own, else the one of the run that started it.
+const runIdOf = (list: AgentRun[]): Map<AgentRun, string> => {
+  const byId = new Map(list.flatMap(a => (a.agentId ? [[a.agentId, a] as const] : [])))
+  const out = new Map<AgentRun, string>()
+  const find = (a: AgentRun, hops: number): string | undefined => {
+    if (a.workflow) return a.workflow.runId
+    const parent = a.parentId ? byId.get(a.parentId) : undefined
+    return parent && hops < MAX_RUNS ? find(parent, hops + 1) : undefined
+  }
+  for (const a of list) {
+    const runId = find(a, 0)
+    if (runId !== undefined) out.set(a, runId)
+  }
+  return out
+}
+
+const GROUP_PREFIX = 'wf:'
+const isGroupRow = (a: AgentRun): boolean => a.id.startsWith(GROUP_PREFIX)
+
+// One row standing for a workflow run: its agents' sums, and how many of them answered
+// as its steps, so the bar and the percentage read as they do for a reporting run.
+const standIn = (g: Group, name: string): AgentRun => {
+  const sum = (k: 'tokens' | 'costUsd' | 'steps') => g.rows.reduce((s, a) => s + a[k], 0)
+  const running = g.rows.filter(a => a.status === 'running').length
+  const status: AgentStatus = running ? 'running' : g.rows.some(a => a.status === 'failed') ? 'failed' : 'done'
+  return {
+    id: GROUP_PREFIX + g.runId,
+    type: 'workflow',
+    description: name || `workflow ${g.runId.replace(/^wf_/, '').slice(0, 8)}`,
+    model: g.rows[0]?.model ?? '',
+    status,
+    startedAt: Math.min(...g.rows.map(a => a.startedAt)),
+    ...(running ? {} : { endedAt: Math.max(...g.rows.map(a => a.endedAt ?? a.startedAt)) }),
+    contextTokens: 0,
+    contextMax: 0,
+    tokens: sum('tokens'),
+    costUsd: sum('costUsd'),
+    steps: sum('steps'),
+    round: 1,
+    stepDone: g.rows.length - running,
+    stepTotal: g.rows.length,
+    ...(running ? { stepNote: `${running} ${tr().isRunning}` } : {}),
+  }
+}
+
+type Units = { runs: AgentRun[]; groups: Map<string, Group> }
+
+// The session's runs as the pane and the band count them, in start order: each run
+// on its own, and each workflow run once, where its first agent started.
+const unitsOf = (list: AgentRun[], names: Record<string, string>): Units => {
+  const of = runIdOf(list)
+  const groups = new Map<string, Group>()
+  const order: (AgentRun | Group)[] = []
+  for (const a of list) {
+    const runId = of.get(a)
+    if (runId === undefined) {
+      order.push(a)
+      continue
+    }
+    const g = groups.get(runId) ?? { runId, rows: [] }
+    if (!groups.has(runId)) {
+      groups.set(runId, g)
+      order.push(g)
+    }
+    g.rows.push(a)
+  }
+  const byRow = new Map<string, Group>()
+  const runs = order.map(u => {
+    if (!('runId' in u)) return u
+    const row = standIn(u, names[u.runId] ?? '')
+    byRow.set(row.id, u)
+    return row
+  })
+  return { runs, groups: byRow }
+}
+
+// The rows a section draws: each run with the runs it started beneath it, and each
+// workflow run as one row, its agents a level deeper when it is open.
+const layout = (runs: AgentRun[], groups: Map<string, Group>, open: ReadonlySet<string>): Nested[] => {
+  const trees = new Map<AgentRun, Nested[]>()
+  let tree: Nested[] = []
+  for (const n of nest(runs.filter(a => !groups.has(a.id)))) {
+    if (n.depth === 0) trees.set(n.a, (tree = []))
+    tree.push(n)
+  }
+  return runs.flatMap(a => {
+    const g = groups.get(a.id)
+    if (!g) return trees.get(a) ?? []
+    const head = { a, depth: 0 }
+    return open.has(g.runId) ? [head, ...nest(g.rows).map(n => ({ a: n.a, depth: n.depth + 1 }))] : [head]
+  })
+}
+
+async function unitRuns($: EngineInterface): Promise<AgentRun[]> {
+  return unitsOf(await read($, agents), await read($, workflows)).runs
 }
 
 const STATUS_GLYPH: Record<string, string> = { running: '●', done: '✓', failed: '✗', planned: '◷' }
@@ -984,7 +1101,7 @@ export const register: Register = (on, options) => {
     })
     if (next?.isFinished) stepAside($, next)
     if (next && input.tasks?.length) await autoOpen($, next.title)
-    return { result: `ok: ${label(next ?? blank(), runningOf(await read($, agents)))}` }
+    return { result: `ok: ${label(next ?? blank(), runningOf(await unitRuns($)))}` }
   })
 
   // A worker's own progress: the call runs in the worker's loop, so agentId names it.
@@ -1007,7 +1124,10 @@ export const register: Register = (on, options) => {
     // A resume (a parent woken when its background child answers, say) continues a run
     // already listed: its prompt is the waking message, which the engine keeps as sent.
     const isResume = e.resume !== undefined
-    const started = await next(isResume ? e : { ...e, prompt: briefed(e.prompt, options.stepBrief !== 'off') })
+    // A workflow agent answers its script, often many of them at once: the pane counts
+    // them under the run, and their prompts stay as the script wrote them.
+    const wf = e.workflow
+    const started = await next(isResume || wf ? e : { ...e, prompt: briefed(e.prompt, options.stepBrief !== 'off') })
     if (started.deny !== undefined) return started
 
     const at = await $.clock.now()
@@ -1025,13 +1145,14 @@ export const register: Register = (on, options) => {
       return started
     }
     await update($, agents, all => {
-      const round = 1 + all.filter(a => a.id !== id && e.description && norm(a.description) === norm(e.description)).length
+      const round = wf ? 1 : 1 + all.filter(a => a.id !== id && e.description && norm(a.description) === norm(e.description)).length
       const run: AgentRun = {
         id,
         agentId: started.agentId ?? e.resume?.agentId,
         type: e.subagentType,
         description: e.description,
         ...(e.parentAgentId ? { parentId: e.parentAgentId } : {}),
+        ...(wf ? { workflow: { runId: wf.runId, index: wf.agentIndex } } : {}),
         model: started.model,
         status: 'running',
         startedAt: at,
@@ -1042,7 +1163,7 @@ export const register: Register = (on, options) => {
         steps: 0,
         round,
       }
-      return [...all.filter(a => a.id !== run.id), run].slice(-200)
+      return prune([...all.filter(a => a.id !== run.id), run])
     })
     await update($, now, () => at)
     startTicker($)
@@ -1052,8 +1173,21 @@ export const register: Register = (on, options) => {
     // (a run started while none was running), so closing it sticks until the next one.
     const f = await read($, flow)
     if (f && !f.isFinished) await autoOpen($, f.title)
+    else if (wf) await autoOpen($, `wf:${wf.runId}`)
     else if (wasIdle) await autoOpen($, `run:${id}`)
     return started
+  })
+
+  // A workflow run's name, from the Workflow tool's answer, heads its row in the pane.
+  on('tool.call', { tool: 'Workflow' }, async ($, e, next) => {
+    const answered = await next(e)
+    const out = answered.result as { runId?: unknown; workflowName?: unknown } | undefined
+    if (typeof out?.runId === 'string' && out.runId && typeof out.workflowName === 'string' && out.workflowName) {
+      const runId = out.runId
+      const name = out.workflowName
+      await update($, workflows, all => ({ ...Object.fromEntries(Object.entries(all).filter(([k]) => k !== runId).slice(-49)), [runId]: name }))
+    }
+    return answered
   })
 
   // Each model request of a subagent: live context, tokens and cost.
@@ -1140,14 +1274,17 @@ export const register: Register = (on, options) => {
     const p: Panel = await read($, panel)
     const at = Math.max(await read($, now), ...list.map(a => a.startedAt), 0)
 
-    const running = list.filter(a => a.status === 'running').reverse()
-    const finished = list.filter(a => a.status !== 'running').reverse()
-    const shownDone = nest(p.isDoneCollapsed ? [] : p.isEarlierShown ? finished : finished.slice(0, FINISHED_SHOWN))
-    const shownRunning = nest(running)
+    // A workflow run counts as one row, drawn open or closed as the person left it.
+    const { runs, groups } = unitsOf(list, await read($, workflows))
+    const open = new Set(p.openGroups ?? [])
+    const running = runs.filter(a => a.status === 'running').reverse()
+    const finished = runs.filter(a => a.status !== 'running').reverse()
+    const shownDone = layout(p.isDoneCollapsed ? [] : p.isEarlierShown ? finished : finished.slice(0, FINISHED_SHOWN), groups, open)
+    const shownRunning = layout(running, groups, open)
     // The agent whose transcript is in the main view, if any.
     const viewed = e.props.view?.agentId
     const earlier = p.isDoneCollapsed ? 0 : finished.length - finished.slice(0, FINISHED_SHOWN).length
-    const planned = plannedOf(f, list)
+    const planned = plannedOf(f, runs)
     const t = totals(list, at)
     // The pane's title says "Agents"; inside, only the flow's own name.
     const title = f && !f.isFinished ? f.title : ''
@@ -1201,6 +1338,12 @@ export const register: Register = (on, options) => {
         if (shown.deny) $.ui.toast(shown.deny)
       })()
     }
+    const toggleGroup = (runId: string) => () =>
+      update($, panel, prev => {
+        const held = prev.openGroups ?? []
+        return { ...prev, openGroups: held.includes(runId) ? held.filter(r => r !== runId) : [...held, runId].slice(-20) }
+      })
+    const groupMark = (runId: string): string => (open.has(runId) ? '▾' : '▸')
     const toMain = canView && viewed ? <Button key="main" label={`↩ ${s.main}`} plain hotkey="m" onPress={show()} /> : null
     const isEmpty = list.length === 0 && planned.length === 0
     const summary = `≈${fmtCost(t.cost)}, ${fmtTokens(t.tokens)} ${s.tokensWord}, ${fmtTime(t.time)}`
@@ -1213,19 +1356,24 @@ export const register: Register = (on, options) => {
           {text}
         </Text>
       )
-      // The drawing leaves room beside it for the button that opens the run's transcript.
-      const rowW = canView ? W - VIEW_W : W
+      // The drawing leaves room beside it for the button that opens the run's transcript,
+      // or, on a workflow run, the one that shows its agents.
       const agentRow = ({ a, depth }: Nested, state: string) => {
         const isViewed = !!a.agentId && a.agentId === viewed
+        const g = groups.get(a.id)
+        const rowW = canView || g ? W - VIEW_W : W
+        const what = g ? `workflow, ${a.stepDone ?? 0}/${a.stepTotal ?? 0} ${s.agentsCount}` : modelName(a.model)
         return (
           <Box key={a.id} flexDirection="row" alignItems="center" gap={1}>
             <Svg
               source={agentSvg(rowW, a, at, depth, isViewed)}
-              alt={`${a.description}: ${modelName(a.model)}, ${state}${isViewed ? `, ${s.inView}` : ''}`}
+              alt={`${a.description}: ${what}, ${state}${isViewed ? `, ${s.inView}` : ''}`}
               width={rowW}
               height={66}
             />
-            {canPress(a, isViewed) ? (
+            {g ? (
+              <Button key={`open-${a.id}`} label={`${groupMark(g.runId)} ${g.rows.length}`} plain onPress={toggleGroup(g.runId)} />
+            ) : canPress(a, isViewed) ? (
               <Button key={`view-${a.id}`} label={isViewed ? '↩' : s.view} plain onPress={show(isViewed ? undefined : a.agentId)} />
             ) : null}
           </Box>
@@ -1235,7 +1383,7 @@ export const register: Register = (on, options) => {
       if (p.isCompact) {
         return (
           <Box flexDirection="column" gap={1}>
-            <Svg source={compactSvg(W, list, planned, t)} alt={`${list.length} ${s.agentsCount}, ${summary}`} width={W} height={32} />
+            <Svg source={compactSvg(W, runs, planned, t)} alt={`${runs.length} ${s.agentsCount}, ${summary}`} width={W} height={32} />
             {toggleCompact}
           </Box>
         )
@@ -1264,6 +1412,7 @@ export const register: Register = (on, options) => {
     const barW = Math.max(6, Math.min(20, cols - 34))
     const row = ({ a, depth }: Nested) => {
       const isViewed = !!a.agentId && a.agentId === viewed
+      const g = groups.get(a.id)
       const tier = tierOfRun(a)
       const color = colorOf(tier)
       const ctx = ctxOf(a)
@@ -1275,8 +1424,14 @@ export const register: Register = (on, options) => {
       return (
         <Box key={a.id} flexDirection="column" marginBottom={1} paddingLeft={2 * Math.min(depth, MAX_DEPTH)}>
           <Box flexDirection="row" gap={1}>
-            <Text color={color}>{isViewed ? '▶' : depth ? '↳' : '▣'}</Text>
-            {canPress(a, isViewed) ? (
+            <Text color={color}>{isViewed ? '▶' : g ? '⧉' : depth ? '↳' : '▣'}</Text>
+            {g ? (
+              <Button key={`open-${a.id}`} plain onPress={toggleGroup(g.runId)}>
+                <Text bold wrap="truncate-end">
+                  {groupMark(g.runId)} {a.description}
+                </Text>
+              </Button>
+            ) : canPress(a, isViewed) ? (
               <Button key={`view-${a.id}`} plain onPress={show(isViewed ? undefined : a.agentId)}>
                 <Text bold color={isViewed ? ACCENT : undefined} wrap="truncate-end">
                   {a.description || a.type}
@@ -1291,8 +1446,9 @@ export const register: Register = (on, options) => {
           </Box>
           <Text dimColor wrap="truncate-end">
             {'  '}
-            {tier === 'other' ? a.type : tier} · {model}
+            {g ? `${a.type} · ${g.rows.length} ${s.agentsCount}` : `${tier === 'other' ? a.type : tier} · ${model}`}
             {a.round > 1 ? ` · ${s.round} ${a.round}` : ''}
+            {g && a.status === 'failed' ? ` · ${s.failed}` : ''}
           </Text>
           <Text wrap="truncate-end">
             {'  '}
@@ -1300,7 +1456,9 @@ export const register: Register = (on, options) => {
             {steps ? ` ${steps}` : ''}
           </Text>
           <Text dimColor wrap="truncate-end">
-            {'  '}ctx {ctx}% · {fmtTokens(a.contextTokens)} · ≈{fmtCost(a.costUsd)} · {fmtTime(elapsed(a, at))}
+            {'  '}
+            {g ? `${fmtTokens(a.tokens)} ${s.tokensWord}` : `ctx ${ctx}% · ${fmtTokens(a.contextTokens)}`} · ≈{fmtCost(a.costUsd)} ·{' '}
+            {fmtTime(elapsed(a, at))}
           </Text>
         </Box>
       )
@@ -1382,7 +1540,8 @@ export const register: Register = (on, options) => {
 
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
-    const list = await read($, agents)
+    // A workflow run counts once, as in the pane.
+    const list = await unitRuns($)
     const crew = runsOf(f, list).length + plannedOf(f, list).length
     const running = runningOf(list)
     const crewButton = (

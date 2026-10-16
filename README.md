@@ -5,6 +5,7 @@ A Claude Code mod, forked from [savvy-progress](https://github.com/johnnyvizz/cl
 - **Agents panel** (`/agents-info` toggles it): opens by itself when any subagent starts, once per busy spell (a run started while none was running) or once per reported flow, so closing it sticks until then. Shows the session's subagents, across flows: running, the latest ten finished (a `+N earlier` button opens the rest) and the planned ones, with model, effort, task progress (percent and steps, once the run reports them), context, estimated cost and time; the totals count every run.
   - Pressing a run (its title on the terminal, its `View` button on the desktop) puts its transcript in the main view, and on the run in view brings the main conversation back; `↩ Main conversation` (`m`) does too. The run in view is marked.
   - A run another subagent started sits right under it, indented.
+  - A workflow run (the Workflow tool) is one row named after the workflow: its agents answered out of started as the bar, with their summed tokens, cost and time. Its `▸` button (the title on the terminal) opens its agents beneath it. Its agents keep their prompts as the script wrote them, and the progress bar counts the run once.
   - With the pane focused, `c` collapses it, `f` folds the finished runs and `e` opens the earlier ones. `Esc` closes it, from the pane or from an idle, empty prompt.
   - On the terminal each run takes four rows: name, tier and model, the bar with the task's steps, then context, tokens, cost and time.
 - **Progress bar**: the flow's title, phase, accepted tasks out of planned, and a button with the crew size that opens the panel. It appears once something calls `progress`, sits under any other plugin's band, and steps aside 10 seconds after the flow is reported finished.
@@ -13,7 +14,7 @@ A Claude Code mod, forked from [savvy-progress](https://github.com/johnnyvizz/cl
 ## Tools and skill
 
 - `mcp__agents-progress__progress`: the delegating session reports the plan, phase and accepted tasks.
-- `mcp__agents-progress__step`: a subagent reports its own steps (`done`, `total`, `note`). The mod adds a paragraph asking for it to every subagent's prompt; a run that does not report shows its context fill in grey.
+- `mcp__agents-progress__step`: a subagent reports its own steps (`done`, `total`, `note`). The mod adds a paragraph asking for it to every subagent's prompt, except a workflow's agents; a run that does not report shows its context fill in grey.
 - Neither tool draws a row in the transcript, as the band and the panel show what they report; a call that failed still shows.
 - Skill `agents-progress:reportar-progresso`: Claude loads it before any delegation to report the plan and each accepted task. It is not in the `/` menu.
 

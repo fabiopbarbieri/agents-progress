@@ -39,6 +39,8 @@ export type AgentRun = {
   round: number
   /** The agentId of the subagent that started this one; absent when the main loop did. */
   parentId?: string
+  /** Set when a workflow script's `agent()` started it: its run and place in it, from 1. */
+  workflow?: { runId: string; index: number }
   /** Self-reported by the worker through the `step` tool. */
   stepDone?: number
   stepTotal?: number
@@ -51,6 +53,8 @@ export type Panel = {
   /** Every finished run drawn, not only the latest ten; absent in a panel held from before. */
   isEarlierShown?: boolean
   autoOpenedFor: string
+  /** Workflow runs drawn with their agents beneath; the rest show as one row. */
+  openGroups?: string[]
 }
 
 declare module 'claude-code' {
@@ -60,6 +64,8 @@ declare module 'claude-code' {
       agents: AgentRun[]
       panel: Panel
       now: number
+      /** Each workflow run's name, by run id, as the Workflow tool answered it. */
+      workflows: Record<string, string>
     }
   }
 }
