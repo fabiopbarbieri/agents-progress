@@ -1018,7 +1018,7 @@ export const register: Register = (on, options) => {
     if (isResume && held) {
       // The same run at work again: its start, totals, steps and round stay.
       await update($, agents, all =>
-        all.map(a => (a.id === id ? { ...a, model: started.model || a.model, status: 'running', endedAt: undefined } : a)),
+        all.map(a => (a.id === id ? { ...a, model: started.model || a.model, status: 'running' as const, endedAt: undefined } : a)),
       )
       await update($, now, () => at)
       startTicker($)
