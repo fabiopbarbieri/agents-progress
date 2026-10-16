@@ -6,6 +6,7 @@ A Claude Code mod, forked from [savvy-progress](https://github.com/johnnyvizz/cl
   - Pressing a run (its title on the terminal, its `View` button on the desktop) puts its transcript in the main view, and on the run in view brings the main conversation back; `↩ Main conversation` (`m`) does too. The run in view is marked.
   - A run another subagent started sits right under it, indented.
   - A workflow run (the Workflow tool) is one row named after the workflow: its agents answered out of started as the bar, with their summed tokens, cost and time. Its `▸` button (the title on the terminal) opens its agents beneath it. Its agents keep their prompts as the script wrote them, and the progress bar counts the run once.
+  - A run that answered and is woken again shows as running from the start of its new turn.
   - With the pane focused, `c` collapses it, `f` folds the finished runs and `e` opens the earlier ones. `Esc` closes it, from the pane or from an idle, empty prompt.
   - On the terminal each run takes four rows: name, tier and model, the bar with the task's steps, then context, tokens, cost and time.
 - **Progress bar**: the flow's title, phase, accepted tasks out of planned, and a button with the crew size that opens the panel. It appears once something calls `progress`, sits under any other plugin's band, and steps aside 10 seconds after the flow is reported finished.

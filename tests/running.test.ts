@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { BAND, engine, progress, spawn } from './kit'
+import { BAND, PANE, engine, progress, spawn } from './kit'
 
 test('the flow counts runs still at work, though the Agent tool already answered', async ($, on) => {
   mock.clock(on, { now: 1000 })
@@ -37,4 +37,22 @@ test('runs at work under a planned flow fill the faint layer of the bar', async 
   await $.agent.spawn(spawn('1') as never)
   expect(await faint()).toBe(true)
   await ui.unmount()
+})
+
+test('a run woken after it answered is at work from its turn start', async ($, on) => {
+  mock.clock(on, { now: 1000 })
+  engine(on)
+  on('turn.start', async (_$, e) => ({ turnId: e.turnId }))
+  await $.agent.spawn(spawn('1') as never)
+  await $.turn.complete({ agentId: 'a-task 1', reason: 'answer', answer: 'ok' } as never)
+
+  const term = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
+  expect(await term.find({ type: 'Text', text: /Running/ })).toBeUndefined()
+  await $.turn.start({ text: 'one more thing', turnId: 't-2', agentId: 'a-task 1' } as never)
+  expect(await term.find({ type: 'Text', text: /Running · 1/ })).toBeDefined()
+  // The main loop's turns and unknown agents change nothing.
+  await $.turn.start({ text: 'hi', turnId: 't-3' } as never)
+  await $.turn.start({ text: 'hi', turnId: 't-4', agentId: 'a-nobody' } as never)
+  expect(await term.find({ type: 'Text', text: /Running · 1/ })).toBeDefined()
+  await term.unmount()
 })

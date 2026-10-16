@@ -1190,6 +1190,23 @@ export const register: Register = (on, options) => {
     return answered
   })
 
+  // A run that answered and is woken again (a message to it, a teammate's turn) is at
+  // work from its turn's start, not only once its first model request returns.
+  on('turn.start', async ($, e, next) => {
+    const started = await next(e)
+    const agentId = e.agentId
+    if (!agentId) return started
+    const list = await patchAgents($, list =>
+      list.map(a => (a.agentId === agentId && a.status !== 'running' ? { ...a, status: 'running', endedAt: undefined } : a)),
+    )
+    if (list.some(a => a.agentId === agentId)) {
+      const at = await $.clock.now()
+      await update($, now, () => at)
+      startTicker($)
+    }
+    return started
+  })
+
   // Each model request of a subagent: live context, tokens and cost.
   on('turn.step', async function* ($, e, next) {
     const result = yield* next(e)
