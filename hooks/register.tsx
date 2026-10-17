@@ -87,6 +87,7 @@ const STRINGS = {
     main: 'Main conversation',
     inView: 'in view',
     gone: "This run's transcript is gone: Claude Code lets a run go about 30 seconds after it ends.",
+    tiers: { fable: 'fable', heavy: 'heavy', careful: 'careful', medium: 'medium', light: 'light' },
   },
   pt: {
     pane: 'Agentes',
@@ -122,6 +123,7 @@ const STRINGS = {
     main: 'Conversa principal',
     inView: 'em vista',
     gone: 'O transcript deste run não está mais disponível: o Claude Code libera um run cerca de 30 s depois que ele termina.',
+    tiers: { fable: 'fable', heavy: 'pesado', careful: 'cuidadoso', medium: 'médio', light: 'leve' },
   },
   ru: {
     pane: 'Агенты',
@@ -157,6 +159,7 @@ const STRINGS = {
     main: 'Основной диалог',
     inView: 'открыт',
     gone: 'Транскрипт этого запуска больше недоступен: Claude Code отпускает запуск примерно через 30 секунд после завершения.',
+    tiers: { fable: 'fable', heavy: 'тяжёлый', careful: 'тщательный', medium: 'средний', light: 'лёгкий' },
   },
 } as const
 
@@ -1442,7 +1445,8 @@ export const register: Register = (on, options) => {
       const color = colorOf(tier)
       const ctx = ctxOf(a)
       const progress = progressOf(a)
-      const model = a.effort ? `${modelName(a.model)} · ${a.effort}` : modelName(a.model)
+      const model = a.effort ? `${modelName(a.model)} ${a.effort}` : modelName(a.model)
+      const tierName = tier === 'other' ? a.type : ((s.tiers as Record<string, string>)[tier] ?? tier)
       // The bar and the task's own steps on one row, the run's numbers on the next:
       // one row held both, and a step's note truncated them.
       const steps = stepsOf(a, ' · ')
@@ -1471,7 +1475,7 @@ export const register: Register = (on, options) => {
           </Box>
           <Text dimColor wrap="truncate-end">
             {'  '}
-            {g ? `${a.type} · ${g.rows.length} ${s.agentsCount}` : `${tier === 'other' ? a.type : tier} · ${model}`}
+            {g ? `${a.type} · ${g.rows.length} ${s.agentsCount}` : `${model} | ${tierName}`}
             {a.round > 1 ? ` · ${s.round} ${a.round}` : ''}
             {g && a.status === 'failed' ? ` · ${s.failed}` : ''}
           </Text>
@@ -1482,7 +1486,7 @@ export const register: Register = (on, options) => {
           </Text>
           <Text dimColor wrap="truncate-end">
             {'  '}
-            {g ? `${fmtTokens(a.tokens)} ${s.tokensWord}` : `ctx ${ctx}% · ${fmtTokens(a.contextTokens)}`} · ≈{fmtCost(a.costUsd)} ·{' '}
+            {g ? `${fmtTokens(a.tokens)} ${s.tokensWord}` : `${ctx}% · ${fmtTokens(a.contextTokens)}`} · ≈{fmtCost(a.costUsd)} ·{' '}
             {fmtTime(elapsed(a, at))}
           </Text>
         </Box>

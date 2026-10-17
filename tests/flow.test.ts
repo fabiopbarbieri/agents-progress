@@ -90,8 +90,8 @@ test("a run that reports steps shows its task's percentage on both surfaces, the
   const term = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
   expect(await term.find({ type: 'Text', text: / 40% · 2\/5 · reading$/ })).toBeDefined()
   // The run's own numbers take the next row, so a long note cuts neither.
-  expect(await term.find({ type: 'Text', text: /^ {2}ctx \d+% · \d+ · ≈\$0\.00 · 0:00$/ })).toBeDefined()
-  expect(await term.find({ type: 'Text', text: /2\/5.*ctx/ })).toBeUndefined()
+  expect(await term.find({ type: 'Text', text: /^ {2}\d+% · \d+ · ≈\$0\.00 · 0:00$/ })).toBeDefined()
+  expect(await term.find({ type: 'Text', text: /2\/5.*≈\$/ })).toBeUndefined()
   // A run that reports nothing keeps its context share alone.
   const percents = await term.findAll({ type: 'Text', text: /\d+% · \d+\/\d+/ })
   expect(percents.length).toBeGreaterThan(0)
@@ -123,7 +123,7 @@ test("each model request adds the run's tokens and estimated cost", async ($, on
 
   const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
   // Sonnet: 1000×2 + 500×10 + 20000×0.2 + 3000×2.5 per million = $0.0185 a request.
-  expect(await ui.find({ type: 'Text', text: /ctx 2% · 25k · ≈\$0\.04/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^ {2}2% · 25k · ≈\$0\.04/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /≈\$0\.04 · 49k tokens/ })).toBeDefined()
   await ui.unmount()
 })
@@ -149,5 +149,16 @@ test('the language option draws the band and the pane in Portuguese', { options:
   await band.unmount()
   const pane = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
   expect(await pane.find({ type: 'Text', text: 'Nenhum subagente ainda.' })).toBeDefined()
+  await pane.unmount()
+})
+
+test("the terminal names a run's model, then its tier in the panel's language", { options: { language: 'pt' } }, async ($, on) => {
+  mock.clock(on, { now: 1000 })
+  engine(on)
+  on('session.start', async (_$, e) => ({ cwd: e.cwd }))
+  await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as never)
+  await $.agent.spawn(spawn('1') as never)
+  const pane = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
+  expect(await pane.find({ type: 'Text', text: /^ {2}Sonnet 5\.5 \| médio$/ })).toBeDefined()
   await pane.unmount()
 })

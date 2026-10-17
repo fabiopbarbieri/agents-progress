@@ -2,6 +2,12 @@
 
 All notable changes to agents-progress. The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); see *Versioning* in the README.
 
+## [Unreleased]
+
+### Changed
+
+- On the terminal, a run's second row reads model, effort, then tier (`Opus 5.5 high | careful`), the tier named in the panel's language (`cuidadoso`, `тщательный`). Its last row drops the `ctx` label before the context share.
+
 ## [1.2.0] - 2026-10-16
 
 ### Added

@@ -53,9 +53,9 @@ test('a run with no tier in its type takes the tier of its model', async ($, on)
     requestId: 'agents-progress',
     props: { title: 'Agents', isFocused: false, bodyColumns: 80, placement: 'dock', scroll: undefined as never },
   })
-  expect(await ui.find({ type: 'Text', text: /medium · Sonnet 5\.5/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /light · Haiku 5\.5/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /fable · Fable 5\.1/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /careful · Opus 5\.5/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Sonnet 5\.5 \| medium/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Haiku 5\.5 \| light/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Fable 5\.1 \| fable/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Opus 5\.5 \| careful/ })).toBeDefined()
   await ui.unmount()
 })
