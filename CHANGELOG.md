@@ -4,6 +4,10 @@ All notable changes to agents-progress. The project follows [Semantic Versioning
 
 ## [Unreleased]
 
+### Added
+
+- A simple view on the terminal: the pane's `[ ○ ]` button (`s`) draws each run and planned task without its grey rows, leaving the name, status and bar. `[ ● ]` brings them back. The choice is kept in `panel.isSimple`.
+
 ### Changed
 
 - On the terminal, a run's second row reads model, effort, then tier (`Opus 5.5 high | careful`), the tier named in the panel's language (`cuidadoso`, `тщательный`). Its last row drops the `ctx` label before the context share.

@@ -50,6 +50,8 @@ export type AgentRun = {
 export type Panel = {
   isCompact: boolean
   isDoneCollapsed: boolean
+  /** The terminal draws each run without its grey rows; absent in a panel held from before. */
+  isSimple?: boolean
   /** Every finished run drawn, not only the latest ten; absent in a panel held from before. */
   isEarlierShown?: boolean
   autoOpenedFor: string

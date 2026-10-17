@@ -1319,7 +1319,7 @@ export const register: Register = (on, options) => {
 
     // The terminal draws a plain Button's hotkey before its label (`c: Collapse`): there the
     // keyed buttons go framed (`[ − ]`), which keeps the key and drops the prefix. The
-    // header's collapse takes a glyph. A desktop draws native buttons either way.
+    // header's two take glyphs. A desktop draws native buttons either way.
     const isText = !(e.surface === 'desktop' && 'Svg' in ui)
     const plain = isText ? undefined : true
     const toggleCompact = (
@@ -1329,6 +1329,15 @@ export const register: Register = (on, options) => {
         plain={plain}
         hotkey="c"
         onPress={() => update($, panel, prev => ({ ...prev, isCompact: !prev.isCompact }))}
+      />
+    )
+    // Terminal only: the rows keep their name and bar, without the grey rows beneath.
+    const toggleSimple = (
+      <Button
+        key="simple"
+        label={p.isSimple ? '●' : '○'}
+        hotkey="s"
+        onPress={() => update($, panel, prev => ({ ...prev, isSimple: !prev.isSimple }))}
       />
     )
     const toggleDone = (
@@ -1478,22 +1487,26 @@ export const register: Register = (on, options) => {
             )}
             <Text color={a.status === 'failed' ? 'red' : a.status === 'done' ? 'green' : color}>{STATUS_GLYPH[a.status]}</Text>
           </Box>
-          <Text dimColor wrap="truncate-end">
-            {'  '}
-            {g ? `${a.type} · ${g.rows.length} ${s.agentsCount}` : `${model} | ${tierName}`}
-            {a.round > 1 ? ` · ${s.round} ${a.round}` : ''}
-            {g && a.status === 'failed' ? ` · ${s.failed}` : ''}
-          </Text>
+          {!p.isSimple && (
+            <Text dimColor wrap="truncate-end">
+              {'  '}
+              {g ? `${a.type} · ${g.rows.length} ${s.agentsCount}` : `${model} | ${tierName}`}
+              {a.round > 1 ? ` · ${s.round} ${a.round}` : ''}
+              {g && a.status === 'failed' ? ` · ${s.failed}` : ''}
+            </Text>
+          )}
           <Text wrap="truncate-end">
             {'  '}
             {progress === null ? <Text dimColor>{ctxBar(ctx, barW)}</Text> : <Text color={color}>{ctxBar(progress * 100, barW)}</Text>}
             {steps ? ` ${steps}` : ''}
           </Text>
-          <Text dimColor wrap="truncate-end">
-            {'  '}
-            {g ? `${fmtTokens(a.tokens)} ${s.tokensWord}` : `${ctx}% · ${fmtTokens(a.contextTokens)}`} · ≈{fmtCost(a.costUsd)} ·{' '}
-            {fmtTime(elapsed(a, at))}
-          </Text>
+          {!p.isSimple && (
+            <Text dimColor wrap="truncate-end">
+              {'  '}
+              {g ? `${fmtTokens(a.tokens)} ${s.tokensWord}` : `${ctx}% · ${fmtTokens(a.contextTokens)}`} · ≈{fmtCost(a.costUsd)} ·{' '}
+              {fmtTime(elapsed(a, at))}
+            </Text>
+          )}
         </Box>
       )
     }
@@ -1504,7 +1517,10 @@ export const register: Register = (on, options) => {
           <Text bold wrap="truncate-end">
             {title}
           </Text>
-          {toggleCompact}
+          <Box flexDirection="row" gap={1} flexShrink={0}>
+            {!p.isCompact && toggleSimple}
+            {toggleCompact}
+          </Box>
         </Box>
         {toMain}
         <Text dimColor>
@@ -1539,11 +1555,13 @@ export const register: Register = (on, options) => {
                   <Text dimColor wrap="truncate-end">
                     <Text color={colorOf(tier)}>▢</Text> {pl.n}. {pl.title} ◷
                   </Text>
-                  <Text dimColor wrap="truncate-end">
-                    {'  '}
-                    {tier} · {TIER_MODEL[tier] ?? ''}
-                    {pl.after.length ? ` · ${s.after} ${pl.after.join(', ')}` : ''}
-                  </Text>
+                  {!p.isSimple && (
+                    <Text dimColor wrap="truncate-end">
+                      {'  '}
+                      {tier} · {TIER_MODEL[tier] ?? ''}
+                      {pl.after.length ? ` · ${s.after} ${pl.after.join(', ')}` : ''}
+                    </Text>
+                  )}
                 </Box>
               )
             })}

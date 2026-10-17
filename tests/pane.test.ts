@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { PANE, engine, finishRuns, spawn } from './kit'
+import { PANE, engine, finishRuns, progress, spawn } from './kit'
 
 test('the pane draws the latest ten finished runs and counts the rest', async ($, on) => {
   mock.clock(on, { now: 1000 })
@@ -57,4 +57,33 @@ test('the earlier runs open and close from their button', async ($, on) => {
     expect(await drawn()).toBe(10)
     await ui.unmount()
   }
+})
+
+test('the simple view drops the grey rows on the terminal, and the desktop draws no such button', async ($, on) => {
+  mock.clock(on, { now: 1000 })
+  engine(on)
+  await $.tool.call(progress({ title: 'Flow', phase: 'delegate', tasks: [{ title: 'task 1', tier: 'medium' }, { title: 'later', tier: 'light' }] }))
+  await $.agent.spawn(spawn('1') as never)
+  const term = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
+  expect(await term.find({ type: 'Button', key: 'simple' })).toMatchObject({ props: { label: '○', hotkey: 's' } })
+  // Framed, so the terminal draws `[ ○ ]` and not `s: ○`; the key stays.
+  expect((await term.find({ type: 'Button', key: 'simple' }))?.props.plain).toBeUndefined()
+  expect(await term.find({ type: 'Button', key: 'compact' })).toMatchObject({ props: { label: '−', hotkey: 'c' } })
+  expect(await term.find({ type: 'Text', text: /Sonnet 5\.5 \| medium/ })).toBeDefined()
+  expect(await term.find({ type: 'Text', text: /≈\$/ })).toBeDefined()
+  expect(await term.find({ type: 'Text', text: /light · Haiku/ })).toBeDefined()
+  await term.press({ key: 'simple' })
+  expect(await term.find({ type: 'Button', key: 'simple' })).toMatchObject({ props: { label: '●' } })
+  expect(await term.find({ type: 'Text', text: /Sonnet 5\.5 \| medium/ })).toBeUndefined()
+  expect(await term.find({ type: 'Text', text: /^ {2}\d+% · / })).toBeUndefined()
+  expect(await term.find({ type: 'Text', text: /light · Haiku/ })).toBeUndefined()
+  // Name and bar stay.
+  expect(await term.find({ type: 'Text', text: /^task 1$/ })).toBeDefined()
+  await term.press({ key: 'simple' })
+  expect(await term.find({ type: 'Text', text: /Sonnet 5\.5 \| medium/ })).toBeDefined()
+  await term.unmount()
+
+  const desk = await $.ui.mount({ plugin: 'agents-progress', surface: 'desktop', ...PANE })
+  expect(await desk.find({ type: 'Button', key: 'simple' })).toBeUndefined()
+  await desk.unmount()
 })
