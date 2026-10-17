@@ -7,6 +7,7 @@ All notable changes to agents-progress. The project follows [Semantic Versioning
 ### Added
 
 - A simple view on the terminal: the pane's `[ ○ ]` button (`s`) draws each run and planned task without its grey rows, leaving the name, status and bar. `[ ● ]` brings them back. The choice is kept in `panel.isSimple`.
+- A `[ ? ]` at the top left of the terminal's pane, on one row with the totals and the buttons, lists its keys (`s`, `c`, `f`, `e`, `m`, `Esc`) under the header, and hides them again. The buttons and their keys stay where they were. Kept in `panel.isHelpShown`.
 
 ### Changed
 

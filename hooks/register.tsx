@@ -60,6 +60,8 @@ const STRINGS = {
     time: 'Time',
     collapse: 'Collapse',
     expand: 'Expand',
+    keysWhen: 'With the pane focused (ctrl+x tab):',
+    keys: { s: 'simple view', c: 'collapse', f: 'finished', e: 'earlier', m: 'main conversation', Esc: 'close' },
     running: 'Running',
     finished: 'Finished',
     earlier: 'earlier',
@@ -96,6 +98,8 @@ const STRINGS = {
     time: 'Tempo',
     collapse: 'Recolher',
     expand: 'Expandir',
+    keysWhen: 'Com o painel focado (ctrl+x tab):',
+    keys: { s: 'simplificar', c: 'recolher', f: 'concluídos', e: 'anteriores', m: 'conversa principal', Esc: 'fechar' },
     running: 'Em execução',
     finished: 'Concluídos',
     earlier: 'anteriores',
@@ -132,6 +136,8 @@ const STRINGS = {
     time: 'Время',
     collapse: 'Свернуть',
     expand: 'Развернуть',
+    keysWhen: 'Когда панель в фокусе (ctrl+x tab):',
+    keys: { s: 'упростить', c: 'свернуть', f: 'завершённые', e: 'ранее', m: 'основной разговор', Esc: 'закрыть' },
     running: 'Работают',
     finished: 'Завершены',
     earlier: 'ранее',
@@ -1511,21 +1517,63 @@ export const register: Register = (on, options) => {
       )
     }
 
+    // The `?` lists the pane's keys.
+    const toggleHelp = (
+      <Button
+        key="help"
+        label="?"
+        onPress={() => update($, panel, prev => ({ ...prev, isHelpShown: !prev.isHelpShown }))}
+      />
+    )
+    const keyPair = (k: keyof typeof s.keys) => (
+      <Text key={k}>
+        <Text color={ACCENT}>{k}</Text> <Text dimColor>{s.keys[k]}</Text>
+      </Text>
+    )
+    const help = p.isHelpShown ? (
+      <Box flexDirection="column" marginTop={1}>
+        <Text dimColor>{s.keysWhen}</Text>
+        <Text wrap="truncate-end">
+          {'  '}
+          {keyPair('s')} · {keyPair('c')}
+        </Text>
+        <Text wrap="truncate-end">
+          {'  '}
+          {keyPair('f')} · {keyPair('e')}
+        </Text>
+        <Text wrap="truncate-end">
+          {'  '}
+          {keyPair('m')} · {keyPair('Esc')}
+        </Text>
+      </Box>
+    ) : null
+
     return (
       <Box flexDirection="column">
         <Box flexDirection="row" justifyContent="space-between">
-          <Text bold wrap="truncate-end">
-            {title}
-          </Text>
+          {/* One row: the ?, the flow's name, the totals; the name gives way first. */}
+          <Box flexDirection="row" gap={1} flexShrink={1}>
+            {toggleHelp}
+            {title ? (
+              <Box flexShrink={1}>
+                <Text bold wrap="truncate-end">
+                  {title}
+                </Text>
+              </Box>
+            ) : null}
+            <Box flexShrink={0}>
+              <Text dimColor>
+                ≈{fmtCost(t.cost)} · {fmtTokens(t.tokens)} {s.tokensWord} · {fmtTime(t.time)}
+              </Text>
+            </Box>
+          </Box>
           <Box flexDirection="row" gap={1} flexShrink={0}>
             {!p.isCompact && toggleSimple}
             {toggleCompact}
           </Box>
         </Box>
         {toMain}
-        <Text dimColor>
-          ≈{fmtCost(t.cost)} · {fmtTokens(t.tokens)} {s.tokensWord} · {fmtTime(t.time)}
-        </Text>
+        {help}
         {p.isCompact ? (
           <Text wrap="truncate-end">
             {[...running, ...finished].map(a => (
@@ -1540,7 +1588,7 @@ export const register: Register = (on, options) => {
             ))}
           </Text>
         ) : (
-          <Box flexDirection="column" marginTop={1}>
+          <Box flexDirection="column">
             {isEmpty && <Text dimColor>{s.empty}</Text>}
             {running.length > 0 && <Text dimColor>{`${s.running} (${running.length})`}</Text>}
             {shownRunning.map(row)}

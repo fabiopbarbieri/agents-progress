@@ -52,6 +52,8 @@ export type Panel = {
   isDoneCollapsed: boolean
   /** The terminal draws each run without its grey rows; absent in a panel held from before. */
   isSimple?: boolean
+  /** The terminal lists the pane's keys under its header; absent in a panel held from before. */
+  isHelpShown?: boolean
   /** Every finished run drawn, not only the latest ten; absent in a panel held from before. */
   isEarlierShown?: boolean
   autoOpenedFor: string
