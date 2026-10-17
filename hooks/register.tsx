@@ -1317,11 +1317,16 @@ export const register: Register = (on, options) => {
     // The pane's title says "Agents"; inside, only the flow's own name.
     const title = f && !f.isFinished ? f.title : ''
 
+    // The terminal draws a plain Button's hotkey before its label (`c: Collapse`): there the
+    // keyed buttons go framed (`[ − ]`), which keeps the key and drops the prefix. The
+    // header's collapse takes a glyph. A desktop draws native buttons either way.
+    const isText = !(e.surface === 'desktop' && 'Svg' in ui)
+    const plain = isText ? undefined : true
     const toggleCompact = (
       <Button
         key="compact"
-        label={p.isCompact ? s.expand : s.collapse}
-        plain
+        label={isText ? (p.isCompact ? '+' : '−') : p.isCompact ? s.expand : s.collapse}
+        plain={plain}
         hotkey="c"
         onPress={() => update($, panel, prev => ({ ...prev, isCompact: !prev.isCompact }))}
       />
@@ -1330,7 +1335,7 @@ export const register: Register = (on, options) => {
       <Button
         key="done"
         label={`${p.isDoneCollapsed ? '▸' : '▾'} ${s.finished} (${finished.length})`}
-        plain
+        plain={plain}
         hotkey="f"
         onPress={() => update($, panel, prev => ({ ...prev, isDoneCollapsed: !prev.isDoneCollapsed }))}
       />
@@ -1341,7 +1346,7 @@ export const register: Register = (on, options) => {
         <Button
           key="earlier"
           label={p.isEarlierShown ? `▴ ${s.fewer}` : `+${earlier} ${s.earlier}`}
-          plain
+          plain={plain}
           hotkey="e"
           onPress={() => update($, panel, prev => ({ ...prev, isEarlierShown: !prev.isEarlierShown }))}
         />
@@ -1372,7 +1377,7 @@ export const register: Register = (on, options) => {
         return { ...prev, openGroups: held.includes(runId) ? held.filter(r => r !== runId) : [...held, runId].slice(-20) }
       })
     const groupMark = (runId: string): string => (open.has(runId) ? '▾' : '▸')
-    const toMain = canView && viewed ? <Button key="main" label={`↩ ${s.main}`} plain hotkey="m" onPress={show()} /> : null
+    const toMain = canView && viewed ? <Button key="main" label={`↩ ${s.main}`} plain={plain} hotkey="m" onPress={show()} /> : null
     const isEmpty = list.length === 0 && planned.length === 0
     const summary = `≈${fmtCost(t.cost)}, ${fmtTokens(t.tokens)} ${s.tokensWord}, ${fmtTime(t.time)}`
 
