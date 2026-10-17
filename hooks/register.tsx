@@ -1329,7 +1329,7 @@ export const register: Register = (on, options) => {
     const toggleDone = (
       <Button
         key="done"
-        label={`${p.isDoneCollapsed ? '▸' : '▾'} ${s.finished} · ${finished.length}`}
+        label={`${p.isDoneCollapsed ? '▸' : '▾'} ${s.finished} (${finished.length})`}
         plain
         hotkey="f"
         onPress={() => update($, panel, prev => ({ ...prev, isDoneCollapsed: !prev.isDoneCollapsed }))}
@@ -1422,12 +1422,12 @@ export const register: Register = (on, options) => {
           {toggleCompact}
           {toMain}
           {isEmpty && <Text dimColor>{s.empty}</Text>}
-          {running.length > 0 && section('h-run', `${s.running} · ${running.length}`)}
+          {running.length > 0 && section('h-run', `${s.running} (${running.length})`)}
           {shownRunning.map(n => agentRow(n, s.isRunning))}
           {finished.length > 0 && toggleDone}
           {shownDone.map(n => agentRow(n, s.isFinished))}
           {toggleEarlier}
-          {planned.length > 0 && section('h-plan', `${s.planned} · ${planned.length}`)}
+          {planned.length > 0 && section('h-plan', `${s.planned} (${planned.length})`)}
           {planned.map(pl => (
             <Svg key={`plan-${pl.n}`} source={plannedSvg(W, pl)} alt={`${pl.n}. ${pl.title}: ${s.isPlanned}`} width={W} height={46} />
           ))}
@@ -1521,12 +1521,12 @@ export const register: Register = (on, options) => {
         ) : (
           <Box flexDirection="column" marginTop={1}>
             {isEmpty && <Text dimColor>{s.empty}</Text>}
-            {running.length > 0 && <Text dimColor>{s.running} · {running.length}</Text>}
+            {running.length > 0 && <Text dimColor>{`${s.running} (${running.length})`}</Text>}
             {shownRunning.map(row)}
             {finished.length > 0 && toggleDone}
             {shownDone.map(row)}
             {toggleEarlier}
-            {planned.length > 0 && <Text dimColor>{s.planned} · {planned.length}</Text>}
+            {planned.length > 0 && <Text dimColor>{`${s.planned} (${planned.length})`}</Text>}
             {planned.map(pl => {
               const tier = pl.tier in TIER_COLOR ? pl.tier : 'other'
               return (

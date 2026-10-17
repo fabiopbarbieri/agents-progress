@@ -37,7 +37,7 @@ test('a workflow run is one row, named by the Workflow tool, its agents opening 
   await $.turn.complete({ agentId: 'a-task wf_1.1', reason: 'answer', answer: 'ok' } as never)
 
   const term = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
-  expect(await term.find({ type: 'Text', text: /Running · 2/ })).toBeDefined()
+  expect(await term.find({ type: 'Text', text: /Running \(2\)/ })).toBeDefined()
   expect(await term.find({ type: 'Text', text: /Review/ })).toBeDefined()
   expect(await term.find({ type: 'Text', text: /workflow · 3 agents/ })).toBeDefined()
   expect(await term.find({ type: 'Text', text: /33% · 1\/3 · 2 running/ })).toBeDefined()

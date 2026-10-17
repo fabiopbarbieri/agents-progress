@@ -49,10 +49,10 @@ test('a run woken after it answered is at work from its turn start', async ($, o
   const term = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
   expect(await term.find({ type: 'Text', text: /Running/ })).toBeUndefined()
   await $.turn.start({ text: 'one more thing', turnId: 't-2', agentId: 'a-task 1' } as never)
-  expect(await term.find({ type: 'Text', text: /Running · 1/ })).toBeDefined()
+  expect(await term.find({ type: 'Text', text: /Running \(1\)/ })).toBeDefined()
   // The main loop's turns and unknown agents change nothing.
   await $.turn.start({ text: 'hi', turnId: 't-3' } as never)
   await $.turn.start({ text: 'hi', turnId: 't-4', agentId: 'a-nobody' } as never)
-  expect(await term.find({ type: 'Text', text: /Running · 1/ })).toBeDefined()
+  expect(await term.find({ type: 'Text', text: /Running \(1\)/ })).toBeDefined()
   await term.unmount()
 })

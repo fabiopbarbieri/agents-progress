@@ -60,7 +60,7 @@ test('a resumed run carries on in its own row: same start, totals, steps and rou
   expect(await ui.find({ type: 'Text', text: / 50% · 2\/4$/ })).toBeDefined()
   // Timed from its first start, five seconds ago, and at work again.
   expect(await ui.find({ type: 'Text', text: / 0:05$/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: 'Running · 1' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'Running (1)' })).toBeDefined()
   await ui.unmount()
 })
 
