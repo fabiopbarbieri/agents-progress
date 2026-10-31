@@ -46,16 +46,16 @@ test('a run with no tier in its type takes the tier of its model', async ($, on)
   on('agent.spawn', async (_$, e) => ({ model: models[e.description] ?? '', agentId: `a-${e.description}` }))
   for (const id of ['1', '2', '3', '4']) await $.agent.spawn(spawn(id, 'general-purpose') as never)
 
+  // Neither surface names the tier in words: the desktop's crab wears its costume.
   const ui = await $.ui.mount({
     plugin: 'agents-progress',
-    surface: 'terminal',
+    surface: 'desktop',
     component: 'Pane',
     requestId: 'agents-progress',
     props: { title: 'Agents', isFocused: false, bodyColumns: 80, placement: 'dock', scroll: undefined as never },
   })
-  expect(await ui.find({ type: 'Text', text: /Sonnet 5\.5 \| medium/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /Haiku 5\.5 \| light/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /Fable 5\.1 \| fable/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /Opus 5\.5 \| careful/ })).toBeDefined()
+  const rows = await ui.findAll({ type: 'Svg' })
+  const tierOf = (task: string) => String(rows.find(r => String(r.props.alt).startsWith(`${task}:`))?.props.source).match(/class="c-(\w+)/)?.[1]
+  expect(['task 1', 'task 2', 'task 3', 'task 4'].map(tierOf)).toEqual(['medium', 'light', 'fable', 'careful'])
   await ui.unmount()
 })

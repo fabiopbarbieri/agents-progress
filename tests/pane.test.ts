@@ -69,18 +69,18 @@ test('the simple view drops the grey rows on the terminal, and the desktop draws
   // Framed, so the terminal draws `[ ○ ]` and not `s: ○`; the key stays.
   expect((await term.find({ type: 'Button', key: 'simple' }))?.props.plain).toBeUndefined()
   expect(await term.find({ type: 'Button', key: 'compact' })).toMatchObject({ props: { label: '−', hotkey: 'c' } })
-  expect(await term.find({ type: 'Text', text: /Sonnet 5\.5 \| medium/ })).toBeDefined()
+  expect(await term.find({ type: 'Text', text: /^ {2}Sonnet 5\.5$/ })).toBeDefined()
   expect(await term.find({ type: 'Text', text: /≈\$/ })).toBeDefined()
   expect(await term.find({ type: 'Text', text: /light · Haiku/ })).toBeDefined()
   await term.press({ key: 'simple' })
   expect(await term.find({ type: 'Button', key: 'simple' })).toMatchObject({ props: { label: '●' } })
-  expect(await term.find({ type: 'Text', text: /Sonnet 5\.5 \| medium/ })).toBeUndefined()
+  expect(await term.find({ type: 'Text', text: /^ {2}Sonnet 5\.5$/ })).toBeUndefined()
   expect(await term.find({ type: 'Text', text: /^ {2}\d+% · / })).toBeUndefined()
   expect(await term.find({ type: 'Text', text: /light · Haiku/ })).toBeUndefined()
   // Name and bar stay.
   expect(await term.find({ type: 'Text', text: /^task 1$/ })).toBeDefined()
   await term.press({ key: 'simple' })
-  expect(await term.find({ type: 'Text', text: /Sonnet 5\.5 \| medium/ })).toBeDefined()
+  expect(await term.find({ type: 'Text', text: /^ {2}Sonnet 5\.5$/ })).toBeDefined()
   await term.unmount()
 
   const desk = await $.ui.mount({ plugin: 'agents-progress', surface: 'desktop', ...PANE })

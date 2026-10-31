@@ -2,6 +2,17 @@
 
 All notable changes to agents-progress. The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); see *Versioning* in the README.
 
+## [Unreleased]
+
+### Changed
+
+- The desktop pane draws no `View` button, and each run's drawing takes the room it left. The desktop app (4.4212.0, engine 2.1.309) answers every press with `no main view here`, since its main view does not switch to an agent. The terminal keeps the press on the run's title.
+- A run names only its model and effort (`Opus 5.5 high`), no longer its tier in words: on the terminal the `| careful` after them is gone, and on the desktop the word before the model, on runs and planned tasks alike. The crab and the color still show the tier.
+
+### Added
+
+- An icon, `.claude-plugin/icon.png`: the pane's crab over a progress bar.
+
 ## [1.4.0] - 2026-10-31
 
 ### Fixed
