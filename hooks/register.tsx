@@ -1374,16 +1374,21 @@ export const register: Register = (on, options) => {
     const listed = canView ? await listedIds($) : null
     const canPress = (a: AgentRun, isViewed: boolean): a is AgentRun & { agentId: string } =>
       canView && !!a.agentId && (isViewed || !listed || listed.has(a.agentId))
+    // $.ui.view takes only a call made while the press is answered: an await before
+    // it loses the press and the engine denies "not person-initiated". So the view
+    // goes first, and the tasks list is read only to say why a view was denied.
     const show = (agentId?: string) => () => {
+      const viewing = $.ui.view(agentId ? { agentId } : {})
       void (async () => {
+        const shown = await viewing
+        if (!shown.deny) return
         const ids = agentId ? await listedIds($) : null
         if (agentId && ids && !ids.has(agentId)) {
           $.ui.toast(s.gone)
           $.ui.invalidate('ui.render')
           return
         }
-        const shown = await $.ui.view(agentId ? { agentId } : {})
-        if (shown.deny) $.ui.toast(shown.deny)
+        $.ui.toast(shown.deny)
       })()
     }
     const toggleGroup = (runId: string) => () =>

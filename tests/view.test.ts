@@ -177,7 +177,7 @@ test('only a run the tasks list still holds can be pressed; the run in view keep
   await ui.unmount()
 })
 
-test('a run let go after the drawing says so in the panel language, without asking the engine', { options: { language: 'pt' } }, async ($, on) => {
+test('a run let go after the drawing says so in the panel language, not the engine\'s', { options: { language: 'pt' } }, async ($, on) => {
   mock.clock(on, { now: 1000 })
   engine(on)
   on('session.version', async () => ({ value: { version: '2.1.300', base: '2.1.300' } }) as never)
@@ -185,9 +185,11 @@ test('a run let go after the drawing says so in the panel language, without aski
   const held = ['a-task 1']
   listing(on, held)
   const asked: unknown[] = []
+  // The view is asked first, while the press is answered; the engine denies a run it let go.
   on('ui.view', async (_$, e) => {
     asked.push(e)
-    return { value: {} } as never
+    const id = (e as { agentId?: string }).agentId
+    return { value: id && !held.includes(id) ? { deny: 'no such agent' } : {} } as never
   })
   const toasts: string[] = []
   on('ui.toast', async (_$, e) => {
@@ -200,6 +202,6 @@ test('a run let go after the drawing says so in the panel language, without aski
   held.length = 0
   await ui.press({ key: 'view-a-task 1' })
   await ui.unmount()
-  expect(asked).toEqual([])
+  expect(asked).toEqual([{ agentId: 'a-task 1' }])
   expect(toasts).toEqual([expect.stringMatching(/^O transcript deste run não está mais disponível/)])
 })

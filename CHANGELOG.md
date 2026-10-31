@@ -2,6 +2,12 @@
 
 All notable changes to agents-progress. The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); see *Versioning* in the README.
 
+## [Unreleased]
+
+### Fixed
+
+- Pressing a run opens its transcript again. The press read the tasks list before asking for the view, and Claude Code refused the view as `not person-initiated` once the press had been awaited past. The view is now asked first, and the tasks list is read only to explain a refusal.
+
 ## [1.3.0] - 2026-10-17
 
 ### Added
