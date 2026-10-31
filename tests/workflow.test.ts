@@ -15,7 +15,7 @@ const workflowTool = (on: Parameters<typeof mock.clock>[0], runId: string, name:
     ({ result: { status: 'async_launched', taskId: 't-1', runId, workflowName: name } }) as never,
   )
 
-test('a workflow agent keeps the prompt its script wrote', async ($, on) => {
+test('a workflow agent is briefed to report its steps, as any subagent', async ($, on) => {
   mock.clock(on, { now: 1000 })
   const prompts: string[] = []
   on('ui.open', async () => ({ value: { isPlaced: true } }))
@@ -24,7 +24,60 @@ test('a workflow agent keeps the prompt its script wrote', async ($, on) => {
     return { model: 'claude-haiku-5-5', agentId: `a-${e.description}` }
   })
   await $.agent.spawn(wfSpawn('wf_1', 1) as never)
-  expect(prompts).toEqual(['do it'])
+  expect(prompts[0]).toStartWith('do it\n\nReport your progress with `mcp__agents-progress__step`')
+})
+
+test("stepBrief agents leaves a workflow agent's prompt as its script wrote it", { options: { stepBrief: 'agents' } }, async ($, on) => {
+  mock.clock(on, { now: 1000 })
+  const prompts: string[] = []
+  on('ui.open', async () => ({ value: { isPlaced: true } }))
+  on('agent.spawn', async (_$, e) => {
+    prompts.push(e.prompt)
+    return { model: 'claude-haiku-5-5', agentId: `a-${e.description}` }
+  })
+  await $.agent.spawn(wfSpawn('wf_1', 1) as never)
+  await $.agent.spawn(spawn('solo') as never)
+  expect(prompts[0]).toBe('do it')
+  expect(prompts[1]).toStartWith('do it\n\nReport your progress')
+})
+
+test('before 2.1.300 a workflow agent keeps its prompt, as the engine could only refuse it', async ($, on) => {
+  let release = ''
+  const prompts: string[] = []
+  on('session.version', async () => ({ value: { version: release, base: release } }) as never)
+  on('settings.read', async () => ({ value: {} }) as never)
+  on('env.get', async () => ({ value: undefined }) as never)
+  on('session.start', async (_$, e) => ({ cwd: e.cwd }))
+  on('tool.register', async (_$, e) => ({ value: { tool: `mcp__agents-progress__${(e as { name: string }).name}` } }) as never)
+  on('ui.open', async () => ({ value: { isPlaced: true } }))
+  on('agent.spawn', async (_$, e) => {
+    prompts.push(e.prompt)
+    return { model: 'claude-haiku-5-5', agentId: `a-${e.description}` }
+  })
+  mock.clock(on, { now: 1000 })
+  for (const [at, n] of [['2.1.299', 1], ['2.1.300', 2]] as const) {
+    release = at
+    await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as never)
+    await $.agent.spawn(wfSpawn(`wf_${n}`, 1) as never)
+  }
+  expect(prompts[0]).toBe('do it')
+  expect(prompts[1]).toStartWith('do it\n\nReport your progress')
+})
+
+test("a workflow agent's own steps draw its bar when the run is open; the run's row still counts agents", async ($, on) => {
+  mock.clock(on, { now: 1000 })
+  engine(on)
+  workflowTool(on, 'wf_1', 'Review')
+  await $.tool.call({ tool: 'Workflow', name: 'review' } as never)
+  for (const n of [1, 2]) await $.agent.spawn(wfSpawn('wf_1', n) as never)
+  await $.tool.call({ tool: 'mcp__agents-progress__step', agentId: 'a-task wf_1.1', total: 4, done: 1, note: 'reading' } as never)
+
+  const term = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
+  expect(await term.find({ type: 'Text', text: /0% · 0\/2 · 2 running/ })).toBeDefined()
+  expect(await term.find({ type: 'Text', text: /25% · 1\/4 · reading/ })).toBeUndefined()
+  await term.press({ key: 'open-wf:wf_1' })
+  expect(await term.find({ type: 'Text', text: /25% · 1\/4 · reading/ })).toBeDefined()
+  await term.unmount()
 })
 
 test('a workflow run is one row, named by the Workflow tool, its agents opening beneath it', async ($, on) => {
