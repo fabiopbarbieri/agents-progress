@@ -25,10 +25,11 @@
     "stepBrief": {
       "type": "string",
       "title": "Brief subagents to report steps",
-      "description": "on adds a paragraph to every subagent's prompt asking it to report its steps, so the panel shows each task's own progress; off leaves prompts as written",
+      "description": "on adds a paragraph to every subagent's prompt, a workflow's agents included, asking it to report its steps, so the panel shows each task's own progress; agents leaves a workflow's agents out; off leaves prompts as written",
       "default": "on",
       "options": [
         "on",
+        "agents",
         "off"
       ]
     }

@@ -168,8 +168,12 @@ let lang: Lang = 'en'
 // $.ui.view came with Claude Code 2.1.300; the desktop app runs its own engine, which
 // may lag. Set in session.start, as lang is.
 let canView = true
+// Before Claude Code 2.1.300 agent.spawn could only refuse a workflow agent, not rewrite
+// its prompt. Set in session.start, as canView is.
+let canBriefWorkflow = true
 
 const VIEW_SINCE = [2, 1, 300]
+const WF_BRIEF_SINCE = [2, 1, 300]
 // `isDeferred` on $.tool.register came with 2.1.293.
 const LISTED_SINCE = [2, 1, 293]
 
@@ -254,8 +258,7 @@ const STEP_BRIEF =
   'ToolSearch `select:mcp__agents-progress__step`): right after reading this brief, call it with `total` (your plan ' +
   'in 3 to 8 steps) and `done: 0`; call it again with the new `done` and a short `note` as each step finishes.'
 
-const briefed = (prompt: string, isOn: boolean): string =>
-  !isOn || prompt.includes(STEP_TOOL) ? prompt : `${prompt}\n\n${STEP_BRIEF}`
+const briefed = (prompt: string): string => (prompt.includes(STEP_TOOL) ? prompt : `${prompt}\n\n${STEP_BRIEF}`)
 
 // Runs still at work. The Agent tool answers as soon as a background run starts,
 // so only the runs' own status says how many are out.
@@ -1028,6 +1031,7 @@ export const register: Register = (on, options) => {
     const started = await next(e)
     lang = await detectLang($, options.language)
     canView = await engineHasView($)
+    canBriefWorkflow = await engineSince($, WF_BRIEF_SINCE)
     // A reload drops pending timers: a finished flow held by the host still steps aside.
     const held = await read($, flow)
     if (held?.isFinished) stepAside($, held)
@@ -1139,9 +1143,11 @@ export const register: Register = (on, options) => {
     // already listed: its prompt is the waking message, which the engine keeps as sent.
     const isResume = e.resume !== undefined
     // A workflow agent answers its script, often many of them at once: the pane counts
-    // them under the run, and their prompts stay as the script wrote them.
+    // them under the run. Its prompt gets the brief from 2.1.300, unless stepBrief is `agents`.
     const wf = e.workflow
-    const started = await next(isResume || wf ? e : { ...e, prompt: briefed(e.prompt, options.stepBrief !== 'off') })
+    const brief = options.stepBrief ?? 'on'
+    const isBriefed = !isResume && brief !== 'off' && (!wf || (brief !== 'agents' && canBriefWorkflow))
+    const started = await next(isBriefed ? { ...e, prompt: briefed(e.prompt) } : e)
     if (started.deny !== undefined) return started
 
     const at = await $.clock.now()
