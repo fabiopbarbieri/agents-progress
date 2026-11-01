@@ -6,12 +6,23 @@ All notable changes to agents-progress. The project follows [Semantic Versioning
 
 ### Added
 
-- A task planned `heavy` runs at xhigh effort: each model request of a run whose description matches it is raised to xhigh (max stays max), and the run reads `heavy`. Since Claude Code 2.1.316, `CLAUDE_CODE_SUBAGENT_EFFORT` sets the effort of a subagent no one names a level for, and an Opus run below xhigh read `careful`, so a task planned `heavy` drew as `careful` once it ran. It needs Claude Code 2.1.309 or later, the desktop app's engine included, and stands aside while `CLAUDE_CODE_EFFORT_LEVEL` forces one level. The new `heavyEffort` setting (`on` by default) turns it off.
+- A task planned `heavy` runs at xhigh effort: each model request of a run whose description matches it is raised to xhigh (max stays max), and the run shows the `heavy` crab and color. Since Claude Code 2.1.316, `CLAUDE_CODE_SUBAGENT_EFFORT` sets the effort of a subagent no one names a level for, and an Opus run below xhigh read `careful`, so a task planned `heavy` drew as `careful` once it ran. It needs Claude Code 2.1.309 or later, the desktop app's engine included, and stands aside while `CLAUDE_CODE_EFFORT_LEVEL` forces one level. The new `heavyEffort` setting (`on` by default) turns it off.
 - `AgentRun.plannedTier` in the state: the tier of the planned task a run matched when it started.
+- An icon, `.claude-plugin/icon.png`: the pane's crab over a progress bar.
+- `stepBrief` takes `agents`: it briefs the subagents the Agent tool starts and leaves a workflow script's prompts as written, as 1.2.0 to 1.4.0 did.
 
 ### Changed
 
+- The desktop pane draws no `View` button, and each run's drawing takes the room it left. The desktop app (4.4212.0, engine 2.1.309) answers every press with `no main view here`, since its main view does not switch to an agent. The terminal keeps the press on the run's title.
+- A run names only its model and effort (`Opus 5.5 high`), no longer its tier in words: on the terminal the `| careful` after them is gone, and on the desktop the word before the model, on runs and planned tasks alike. The crab and the color still show the tier.
+- A workflow's agents are briefed to report their steps, as any subagent, so each one opened under its run shows its own bar instead of its context fill in grey. Claude Code 2.1.300 lets `agent.spawn` rewrite a workflow agent's prompt; on an older engine their prompts stay as the script wrote them. The run's own row still counts its agents answered out of started.
+- On the terminal, a narrow pane fits its header to its width: the flow's name goes once fewer than 12 cells would show of it (`Re…` at 110 columns), then the totals drop the word `tokens`, the token count and the time; the buttons stay whole. Claude Code 2.1.305 keeps a docked pane within 45% of the terminal, 48 columns at 110.
+- A narrow run's last row drops the context's token count before its time.
 - The step brief added to each subagent's prompt no longer tells it how to load `mcp__agents-progress__step` with ToolSearch where the tool is listed from the first prompt (Claude Code 2.1.293 and later, the desktop app's 2.1.309 engine included). An older engine keeps the hint.
+
+### Fixed
+
+- The header's totals no longer touch its buttons (`0:13[ ○ ]`) once the flow's name is cut.
 
 ## [1.4.0] - 2026-10-31
 

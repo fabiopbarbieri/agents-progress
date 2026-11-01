@@ -15,13 +15,11 @@ test("pressing a run puts its transcript in the main view, and the run in view b
   })
   await $.agent.spawn(spawn('1') as never)
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ plugin: 'agents-progress', surface, ...viewing() })
-    expect(await ui.find({ type: 'Button', key: 'main' })).toBeUndefined()
-    await ui.press({ key: 'view-a-task 1' })
-    await ui.unmount()
-  }
-  expect(asked).toEqual([{ agentId: 'a-task 1' }, { agentId: 'a-task 1' }])
+  const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...viewing() })
+  expect(await ui.find({ type: 'Button', key: 'main' })).toBeUndefined()
+  await ui.press({ key: 'view-a-task 1' })
+  await ui.unmount()
+  expect(asked).toEqual([{ agentId: 'a-task 1' }])
 
   const term = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...viewing('a-task 1') })
   expect(await term.find({ type: 'Text', text: '▶' })).toBeDefined()
@@ -29,13 +27,26 @@ test("pressing a run puts its transcript in the main view, and the run in view b
   await term.press({ key: 'view-a-task 1' })
   await term.press({ key: 'main' })
   await term.unmount()
-  expect(asked.slice(2)).toEqual([{}, {}])
+  expect(asked.slice(1)).toEqual([{}, {}])
 
   const desk = await $.ui.mount({ plugin: 'agents-progress', surface: 'desktop', ...viewing('a-task 1') })
   const row = (await desk.findAll({ type: 'Svg' })).find(s => String(s.props.alt).startsWith('task 1:'))
   expect(String(row?.props.alt)).toMatch(/, in view$/)
   expect(String(row?.props.source)).toContain('class="tile"')
-  expect(await desk.find({ type: 'Button', key: 'view-a-task 1' })).toMatchObject({ props: { label: '↩' } })
+  await desk.unmount()
+})
+
+test('the desktop draws no View press, as its app denies every view; the row takes its room', { options: { language: 'en' } }, async ($, on) => {
+  mock.clock(on, { now: 1000 })
+  engine(on)
+  await $.agent.spawn(spawn('1') as never)
+  const desk = await $.ui.mount({ plugin: 'agents-progress', surface: 'desktop', ...viewing('a-task 1') })
+  expect(await desk.find({ type: 'Button', key: 'view-a-task 1' })).toBeUndefined()
+  expect(await desk.find({ type: 'Button', key: 'main' })).toBeUndefined()
+  const row = (await desk.findAll({ type: 'Svg' })).find(s => String(s.props.alt).startsWith('task 1:'))
+  expect(row?.props.width).toBe(632)
+  // Nor does it name the run's tier in words.
+  expect(String(row?.props.source)).not.toMatch(/>medium</)
   await desk.unmount()
 })
 
@@ -163,13 +174,11 @@ test('only a run the tasks list still holds can be pressed; the run in view keep
   listing(on, held)
   for (const id of ['1', '2', '3']) await $.agent.spawn(spawn(id) as never)
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({ plugin: 'agents-progress', surface, ...viewing('a-task 3') })
-    expect(await ui.find({ type: 'Button', key: 'view-a-task 1' })).toBeDefined()
-    expect(await ui.find({ type: 'Button', key: 'view-a-task 2' })).toBeUndefined()
-    expect(await ui.find({ type: 'Button', key: 'view-a-task 3' })).toBeDefined()
-    await ui.unmount()
-  }
+  const term = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...viewing('a-task 3') })
+  expect(await term.find({ type: 'Button', key: 'view-a-task 1' })).toBeDefined()
+  expect(await term.find({ type: 'Button', key: 'view-a-task 2' })).toBeUndefined()
+  expect(await term.find({ type: 'Button', key: 'view-a-task 3' })).toBeDefined()
+  await term.unmount()
   // Let go while in view: its way back to the main conversation stays.
   held.splice(1, 1)
   const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...viewing('a-task 3') })

@@ -38,17 +38,26 @@ test("a run's effort and tier follow the level each request ran at", async ($, o
   await request($, '3', 3)
 
   const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
-  expect(await ui.find({ type: 'Text', text: /Opus 5\.5 medium \| careful/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /Opus 5\.5 xhigh \| heavy/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /Opus 5\.5 high \| careful/ })).toBeDefined()
+  for (const level of ['medium', 'xhigh', 'high']) expect(await ui.find({ type: 'Text', text: new RegExp(`Opus 5\\.5 ${level}$`) })).toBeDefined()
   await ui.unmount()
 
-  const desk = await $.ui.mount({ plugin: 'agents-progress', surface: 'desktop', ...PANE })
-  const svg = (await desk.findAll({ type: 'Svg' })).map(s => String(s.props.source)).join('\n')
-  expect(svg).toContain('Opus 5.5 · medium')
-  expect(svg).toContain('Opus 5.5 · xhigh')
-  await desk.unmount()
+  // The tier shows in the crab's costume, not in words.
+  expect(await desktopRows($)).toEqual({ 'task 1': ['careful', 'Opus 5.5 · medium'], 'task 2': ['heavy', 'Opus 5.5 · xhigh'], 'task 3': ['careful', 'Opus 5.5 · high'] })
 })
+
+// Each desktop row's crab costume and model line, by task.
+const desktopRows = async ($: any): Promise<Record<string, [string | undefined, string | undefined]>> => {
+  const desk = await $.ui.mount({ plugin: 'agents-progress', surface: 'desktop', ...PANE })
+  const rows = await desk.findAll({ type: 'Svg' })
+  await desk.unmount()
+  const out: Record<string, [string | undefined, string | undefined]> = {}
+  for (const r of rows) {
+    const task = /^(task \d+):/.exec(String(r.props.alt))?.[1]
+    const source = String(r.props.source)
+    if (task) out[task] = [source.match(/class="c-(\w+)/)?.[1], source.match(/Opus 5\.5 · \w+/)?.[0]]
+  }
+  return out
+}
 
 type Heavy = { release?: string; forced?: string; effort?: string }
 
@@ -83,13 +92,10 @@ const heavyFlow = async ($: any, on: any, { release = '2.1.316', forced, effort 
   return sent
 }
 
-test('a task planned heavy runs at xhigh, and reads heavy; the others keep their effort', async ($, on) => {
+test('a task planned heavy runs at xhigh, wearing the heavy crab; the others keep their effort', async ($, on) => {
   const sent = await heavyFlow($, on)
   expect(sent).toEqual({ 'a-task 1': 'xhigh', 'a-task 2': 'medium' })
-  const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
-  expect(await ui.find({ type: 'Text', text: /Opus 5\.5 xhigh \| heavy/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /Opus 5\.5 medium \| careful/ })).toBeDefined()
-  await ui.unmount()
+  expect(await desktopRows($)).toEqual({ 'task 1': ['heavy', 'Opus 5.5 · xhigh'], 'task 2': ['careful', 'Opus 5.5 · medium'] })
 })
 
 test('a heavy task already at max stays at max', async ($, on) => {

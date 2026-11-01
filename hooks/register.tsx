@@ -85,11 +85,9 @@ const STRINGS = {
     review: 'Review',
     busy: 'Tasks running',
     flow: 'Progress',
-    view: 'View',
     main: 'Main conversation',
     inView: 'in view',
     gone: "This run's transcript is gone: Claude Code lets a run go about 30 seconds after it ends.",
-    tiers: { fable: 'fable', heavy: 'heavy', careful: 'careful', medium: 'medium', light: 'light' },
   },
   pt: {
     pane: 'Agentes',
@@ -123,11 +121,9 @@ const STRINGS = {
     review: 'Revisão',
     busy: 'Tarefas em execução',
     flow: 'Progresso',
-    view: 'Ver',
     main: 'Conversa principal',
     inView: 'em vista',
     gone: 'O transcript deste run não está mais disponível: o Claude Code libera um run cerca de 30 s depois que ele termina.',
-    tiers: { fable: 'fable', heavy: 'pesado', careful: 'cuidadoso', medium: 'médio', light: 'leve' },
   },
   ru: {
     pane: 'Агенты',
@@ -161,11 +157,9 @@ const STRINGS = {
     review: 'Ревью',
     busy: 'Задачи в работе',
     flow: 'Прогресс',
-    view: 'Открыть',
     main: 'Основной диалог',
     inView: 'открыт',
     gone: 'Транскрипт этого запуска больше недоступен: Claude Code отпускает запуск примерно через 30 секунд после завершения.',
-    tiers: { fable: 'fable', heavy: 'тяжёлый', careful: 'тщательный', medium: 'средний', light: 'лёгкий' },
   },
 } as const
 
@@ -180,8 +174,12 @@ let isStepListed = false
 // Whether a heavy task's requests can be raised: an engine that applies a hook's
 // effort, and no CLAUDE_CODE_EFFORT_LEVEL forcing one level on every request.
 let canRaise = false
+// Before Claude Code 2.1.300 agent.spawn could only refuse a workflow agent, not rewrite
+// its prompt. Set in session.start, as canView is.
+let canBriefWorkflow = true
 
 const VIEW_SINCE = [2, 1, 300]
+const WF_BRIEF_SINCE = [2, 1, 300]
 // `isDeferred` on $.tool.register came with 2.1.293.
 const LISTED_SINCE = [2, 1, 293]
 // A turn.step hook's `effort` reaches the request from 2.1.309 at least, the desktop
@@ -273,8 +271,8 @@ const STEP_BRIEF =
 // Before 2.1.293 the tool sits behind tool search, listed by name only.
 const STEP_LOAD = ' If it is listed only by name, load it first with ToolSearch `select:mcp__agents-progress__step`.'
 
-const briefed = (prompt: string, isOn: boolean): string =>
-  !isOn || prompt.includes(STEP_TOOL) ? prompt : `${prompt}\n\n${STEP_BRIEF}${isStepListed ? '' : STEP_LOAD}`
+const briefed = (prompt: string): string =>
+  prompt.includes(STEP_TOOL) ? prompt : `${prompt}\n\n${STEP_BRIEF}${isStepListed ? '' : STEP_LOAD}`
 
 // Runs still at work. The Agent tool answers as soon as a background run starts,
 // so only the runs' own status says how many are out.
@@ -748,6 +746,9 @@ const agentSvg = (full: number, a: AgentRun, at: number, depth = 0, isViewed = f
     : [a.effort ? `${modelName(a.model)} · ${a.effort}` : modelName(a.model)]
   if (a.round > 1) meta.push(`${s.round} ${a.round}`)
   if (a.status === 'failed') meta.push(s.failed)
+  // The tier shows in the crab and the color, not in words; a workflow or an agent type
+  // of no tier still names its type.
+  const lead = isGroup || tier === 'other' ? a.type : ''
   const barW = textW
   const progress = progressOf(a)
   const stats = isGroup
@@ -765,7 +766,7 @@ const agentSvg = (full: number, a: AgentRun, at: number, depth = 0, isViewed = f
     66,
     `${elbow}<g transform="translate(${ind},0)">${tile}${crab(0, 14, costumeOf(a), false, a.status === 'running')}
 <text class="t" x="42" y="18" font-family="${FONT}" font-size="13" font-weight="600">${xml(fitText(a.description || a.type, 13, textW))}</text>
-<text x="42" y="34" font-family="${FONT}" font-size="11"><tspan fill="${color}">${xml(isGroup || tier === 'other' ? a.type : tier)}</tspan><tspan class="s">  ${xml(meta.join('  ·  '))}</tspan></text>
+<text x="42" y="34" font-family="${FONT}" font-size="11">${lead ? `<tspan fill="${color}">${xml(lead)}</tspan>  ` : ''}<tspan class="s">${xml(meta.join('  ·  '))}</tspan></text>
 ${steps && stepsW > 30 ? `<text class="t" x="42" y="49" font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${xml(fitText(steps, 11, stepsW))}</text>` : ''}
 <text class="s" x="${42 + barW}" y="49" text-anchor="end" font-family="${FONT}" font-size="11" font-variant-numeric="tabular-nums">${stats}</text>
 <rect class="k" x="42" y="55" width="${barW}" height="4" rx="2"/><rect${progress === null ? ' class="m"' : ''} x="42" y="55" width="${fillW}" height="4" rx="2"${progress === null ? '' : ` fill="${color}"`}/>
@@ -785,7 +786,7 @@ const plannedSvg = (W: number, p: Planned): string => {
     46,
     `${crab(0, 6, tier, true)}
 <text class="s" x="42" y="18" font-family="${FONT}" font-size="13" font-weight="600">${xml(fitText(`${p.n}. ${p.title}`, 13, textW))}</text>
-<text x="42" y="34" font-family="${FONT}" font-size="11"><tspan fill="${color}">${xml(tier)}</tspan><tspan class="m">  ${xml(meta.filter(Boolean).join('  ·  '))}</tspan></text>
+<text x="42" y="34" font-family="${FONT}" font-size="11"><tspan class="m">${xml(meta.filter(Boolean).join('  ·  '))}</tspan></text>
 ${statusMark(W - 8, 16, 'planned', color)}
 <line class="ln" x1="0" y1="45.5" x2="${W}" y2="45.5"/>`,
   )
@@ -819,11 +820,30 @@ const ctxBar = (pct: number, width: number): string => {
   return '█'.repeat(filled) + '░'.repeat(Math.max(0, width - filled))
 }
 
+// Cells a string takes on the terminal: CJK and emoji take two.
+const cellsOf = (s: string): number =>
+  [...s].reduce((w, ch) => w + (/[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]|\p{Extended_Pictographic}/u.test(ch) ? 2 : 1), 0)
+
+// Since Claude Code 2.1.305 a docked pane takes at most 45% of the terminal, and at
+// least 24 columns: 48 to 70 by default from 110 columns. The header keeps its buttons
+// whole and gives way in this order: the flow's name, the word `tokens`, the token
+// count, the time. A name left fewer cells than this is dropped rather than cut to `R…`.
+const PANE_MIN_COLS = 24
+const TITLE_MIN = 12
+
+// The header's totals, widest first: each drops one more of them.
+const totalsTiers = (t: { cost: number; tokens: number; time: number }, word: string): string[] => {
+  const cost = `≈${fmtCost(t.cost)}`
+  const tokens = fmtTokens(t.tokens)
+  const time = fmtTime(t.time)
+  return [`${cost} · ${tokens} ${word} · ${time}`, `${cost} · ${tokens} · ${time}`, `${cost} · ${time}`, cost]
+}
+
 // The pane draws the latest finished runs; the totals still count every run.
 const FINISHED_SHOWN = 10
 
-// CSS pixels the desktop keeps beside each run's drawing for its transcript button.
-const VIEW_W = 72
+// CSS pixels the desktop keeps beside a workflow run's drawing for the button that opens it.
+const SIDE_W = 72
 
 // Claude Code drops a finished subagent from its tasks list 30 s after it ends, and
 // $.ui.view finds only the agents still there. A redraw a little later takes the press
@@ -1044,6 +1064,7 @@ export const register: Register = (on, options) => {
     const started = await next(e)
     lang = await detectLang($, options.language)
     canView = await engineHasView($)
+    canBriefWorkflow = await engineSince($, WF_BRIEF_SINCE)
     // A reload drops pending timers: a finished flow held by the host still steps aside.
     const held = await read($, flow)
     if (held?.isFinished) stepAside($, held)
@@ -1158,9 +1179,11 @@ export const register: Register = (on, options) => {
     // already listed: its prompt is the waking message, which the engine keeps as sent.
     const isResume = e.resume !== undefined
     // A workflow agent answers its script, often many of them at once: the pane counts
-    // them under the run, and their prompts stay as the script wrote them.
+    // them under the run. Its prompt gets the brief from 2.1.300, unless stepBrief is `agents`.
     const wf = e.workflow
-    const started = await next(isResume || wf ? e : { ...e, prompt: briefed(e.prompt, options.stepBrief !== 'off') })
+    const brief = options.stepBrief ?? 'on'
+    const isBriefed = !isResume && brief !== 'off' && (!wf || (brief !== 'agents' && canBriefWorkflow))
+    const started = await next(isBriefed ? { ...e, prompt: briefed(e.prompt) } : e)
     if (started.deny !== undefined) return started
 
     const at = await $.clock.now()
@@ -1345,6 +1368,9 @@ export const register: Register = (on, options) => {
     const shownRunning = layout(running, groups, open)
     // The agent whose transcript is in the main view, if any.
     const viewed = e.props.view?.agentId
+    // Only the terminal switches its main view to an agent: the desktop app (4.4212.0,
+    // engine 2.1.309) denies every $.ui.view with "no main view here", so it draws no press.
+    const viewHere = canView && e.surface === 'terminal'
     const earlier = p.isDoneCollapsed ? 0 : finished.length - finished.slice(0, FINISHED_SHOWN).length
     const planned = plannedOf(f, runs)
     const t = totals(list, at)
@@ -1399,9 +1425,9 @@ export const register: Register = (on, options) => {
     // An engine before $.ui.view draws no such press: it would do nothing and say nothing.
     // Nor does a run the tasks list let go (the run in view keeps its way back), and one
     // let go since this drawing says so in the panel's language, not the engine's.
-    const listed = canView ? await listedIds($) : null
+    const listed = viewHere ? await listedIds($) : null
     const canPress = (a: AgentRun, isViewed: boolean): a is AgentRun & { agentId: string } =>
-      canView && !!a.agentId && (isViewed || !listed || listed.has(a.agentId))
+      viewHere && !!a.agentId && (isViewed || !listed || listed.has(a.agentId))
     // $.ui.view takes only a call made while the press is answered: an await before
     // it loses the press and the engine denies "not person-initiated". So the view
     // goes first, and the tasks list is read only to say why a view was denied.
@@ -1425,7 +1451,7 @@ export const register: Register = (on, options) => {
         return { ...prev, openGroups: held.includes(runId) ? held.filter(r => r !== runId) : [...held, runId].slice(-20) }
       })
     const groupMark = (runId: string): string => (open.has(runId) ? '▾' : '▸')
-    const toMain = canView && viewed ? <Button key="main" label={`↩ ${s.main}`} plain={plain} hotkey="m" onPress={show()} /> : null
+    const toMain = viewHere && viewed ? <Button key="main" label={`↩ ${s.main}`} plain={plain} hotkey="m" onPress={show()} /> : null
     const isEmpty = list.length === 0 && planned.length === 0
     const summary = `≈${fmtCost(t.cost)}, ${fmtTokens(t.tokens)} ${s.tokensWord}, ${fmtTime(t.time)}`
 
@@ -1437,12 +1463,11 @@ export const register: Register = (on, options) => {
           {text}
         </Text>
       )
-      // The drawing leaves room beside it for the button that opens the run's transcript,
-      // or, on a workflow run, the one that shows its agents.
+      // A workflow run's drawing leaves room beside it for the button that shows its agents.
       const agentRow = ({ a, depth }: Nested, state: string) => {
         const isViewed = !!a.agentId && a.agentId === viewed
         const g = groups.get(a.id)
-        const rowW = canView || g ? W - VIEW_W : W
+        const rowW = g ? W - SIDE_W : W
         const what = g ? `workflow, ${a.stepDone ?? 0}/${a.stepTotal ?? 0} ${s.agentsCount}` : modelName(a.model)
         return (
           <Box key={a.id} flexDirection="row" alignItems="center" gap={1}>
@@ -1452,11 +1477,7 @@ export const register: Register = (on, options) => {
               width={rowW}
               height={66}
             />
-            {g ? (
-              <Button key={`open-${a.id}`} label={`${groupMark(g.runId)} ${g.rows.length}`} plain onPress={toggleGroup(g.runId)} />
-            ) : canPress(a, isViewed) ? (
-              <Button key={`view-${a.id}`} label={isViewed ? '↩' : s.view} plain onPress={show(isViewed ? undefined : a.agentId)} />
-            ) : null}
+            {g && <Button key={`open-${a.id}`} label={`${groupMark(g.runId)} ${g.rows.length}`} plain onPress={toggleGroup(g.runId)} />}
           </Box>
         )
       }
@@ -1489,7 +1510,7 @@ export const register: Register = (on, options) => {
     }
 
     // Terminal: the same content in text rows.
-    const cols = Math.max(24, e.props.bodyColumns || 40)
+    const cols = Math.max(PANE_MIN_COLS, e.props.bodyColumns || 40)
     const barW = Math.max(6, Math.min(20, cols - 34))
     const row = ({ a, depth }: Nested) => {
       const isViewed = !!a.agentId && a.agentId === viewed
@@ -1499,10 +1520,15 @@ export const register: Register = (on, options) => {
       const ctx = ctxOf(a)
       const progress = progressOf(a)
       const model = a.effort ? `${modelName(a.model)} ${a.effort}` : modelName(a.model)
-      const tierName = tier === 'other' ? a.type : ((s.tiers as Record<string, string>)[tier] ?? tier)
       // The bar and the task's own steps on one row, the run's numbers on the next:
       // one row held both, and a step's note truncated them.
       const steps = stepsOf(a, ' · ')
+      // The numbers row, narrowed before it is cut: the context's tokens (its share
+      // stays) or a workflow's word `tokens` go first, so the time stays in sight.
+      const room = cols - 2 * Math.min(depth, MAX_DEPTH) - 2
+      const tail = ` · ≈${fmtCost(a.costUsd)} · ${fmtTime(elapsed(a, at))}`
+      const head = g ? `${fmtTokens(a.tokens)} ${s.tokensWord}` : `${ctx}% · ${fmtTokens(a.contextTokens)}`
+      const numbers = cellsOf(head + tail) <= room ? head + tail : (g ? fmtTokens(a.tokens) : `${ctx}%`) + tail
       return (
         <Box key={a.id} flexDirection="column" marginBottom={1} paddingLeft={2 * Math.min(depth, MAX_DEPTH)}>
           <Box flexDirection="row" gap={1}>
@@ -1529,7 +1555,7 @@ export const register: Register = (on, options) => {
           {!p.isSimple && (
             <Text dimColor wrap="truncate-end">
               {'  '}
-              {g ? `${a.type} · ${g.rows.length} ${s.agentsCount}` : `${model} | ${tierName}`}
+              {g ? `${a.type} · ${g.rows.length} ${s.agentsCount}` : model}
               {a.round > 1 ? ` · ${s.round} ${a.round}` : ''}
               {g && a.status === 'failed' ? ` · ${s.failed}` : ''}
             </Text>
@@ -1542,8 +1568,7 @@ export const register: Register = (on, options) => {
           {!p.isSimple && (
             <Text dimColor wrap="truncate-end">
               {'  '}
-              {g ? `${fmtTokens(a.tokens)} ${s.tokensWord}` : `${ctx}% · ${fmtTokens(a.contextTokens)}`} · ≈{fmtCost(a.costUsd)} ·{' '}
-              {fmtTime(elapsed(a, at))}
+              {numbers}
             </Text>
           )}
         </Box>
@@ -1581,13 +1606,21 @@ export const register: Register = (on, options) => {
       </Box>
     ) : null
 
+    // One row: the ?, the flow's name, the totals, a cell, the buttons. The name keeps
+    // the full totals while it has TITLE_MIN cells, then the shorter ones; below that it
+    // goes (the band above the prompt names the flow), and the totals narrow to fit.
+    const tiers = totalsTiers(t, s.tokensWord)
+    const room = cols - 5 - 1 - 1 - (p.isCompact ? 5 : 11)
+    const titleMin = Math.min(TITLE_MIN, cellsOf(title))
+    const withTitle = title ? tiers.slice(0, 2).find(x => room - cellsOf(x) - 1 >= titleMin) : undefined
+    const totalsText = withTitle ?? tiers.find(x => cellsOf(x) <= room) ?? tiers[tiers.length - 1]!
+
     return (
       <Box flexDirection="column">
-        <Box flexDirection="row" justifyContent="space-between">
-          {/* One row: the ?, the flow's name, the totals; the name gives way first. */}
+        <Box flexDirection="row" justifyContent="space-between" gap={1}>
           <Box flexDirection="row" gap={1} flexShrink={1}>
             {toggleHelp}
-            {title ? (
+            {withTitle ? (
               <Box flexShrink={1}>
                 <Text bold wrap="truncate-end">
                   {title}
@@ -1595,9 +1628,7 @@ export const register: Register = (on, options) => {
               </Box>
             ) : null}
             <Box flexShrink={0}>
-              <Text dimColor>
-                ≈{fmtCost(t.cost)} · {fmtTokens(t.tokens)} {s.tokensWord} · {fmtTime(t.time)}
-              </Text>
+              <Text dimColor>{totalsText}</Text>
             </Box>
           </Box>
           <Box flexDirection="row" gap={1} flexShrink={0}>

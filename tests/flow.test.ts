@@ -152,13 +152,14 @@ test('the language option draws the band and the pane in Portuguese', { options:
   await pane.unmount()
 })
 
-test("the terminal names a run's model, then its tier in the panel's language", { options: { language: 'pt' } }, async ($, on) => {
+test("the terminal names a run's model and effort, without its tier", { options: { language: 'pt' } }, async ($, on) => {
   mock.clock(on, { now: 1000 })
   engine(on)
   on('session.start', async (_$, e) => ({ cwd: e.cwd }))
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as never)
   await $.agent.spawn(spawn('1') as never)
   const pane = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
-  expect(await pane.find({ type: 'Text', text: /^ {2}Sonnet 5\.5 \| médio$/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /^ {2}Sonnet 5\.5$/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /médio|medium/ })).toBeUndefined()
   await pane.unmount()
 })

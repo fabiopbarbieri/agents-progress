@@ -3,20 +3,21 @@
 A Claude Code mod, forked from [savvy-progress](https://github.com/johnnyvizz/claude-kit/tree/main/plugins/savvy-progress) (MIT): a progress bar above the prompt and a live panel of subagents.
 
 - **Agents panel** (`/agents-info` toggles it): opens by itself when any subagent starts, once per busy spell (a run started while none was running) or once per reported flow, so closing it sticks until then. Shows the session's subagents, across flows: running, the latest ten finished (a `+N earlier` button opens the rest) and the planned ones, with model, effort, task progress (percent and steps, once the run reports them), context, estimated cost and time; the totals count every run.
-  - Pressing a run (its title on the terminal, its `View` button on the desktop) puts its transcript in the main view, and on the run in view brings the main conversation back; `↩ Main conversation` (`m`) does too. The run in view is marked.
+  - On the terminal, pressing a run's title puts its transcript in the main view, and on the run in view brings the main conversation back; `↩ Main conversation` (`m`) does too. The run in view is marked. The desktop app does not switch its main view to an agent, so its pane draws no such press.
   - A run another subagent started sits right under it, indented.
-  - A workflow run (the Workflow tool) is one row named after the workflow: its agents answered out of started as the bar, with their summed tokens, cost and time. Its `▸` button (the title on the terminal) opens its agents beneath it. Its agents keep their prompts as the script wrote them, and the progress bar counts the run once.
+  - A workflow run (the Workflow tool) is one row named after the workflow: its agents answered out of started as the bar, with their summed tokens, cost and time. Its `▸` button (the title on the terminal) opens its agents beneath it. Each agent opened beneath it shows its own steps once it reports them, and the progress bar counts the run once.
   - A run that answered and is woken again shows as running from the start of its new turn.
   - With the pane focused, `c` collapses it, `f` folds the finished runs and `e` opens the earlier ones. On the terminal, `s` (`[ ○ ]`) keeps each run to its name and bar, without the grey rows; press it again (`[ ● ]`) for the details. There the buttons are framed, `[ − ]` collapsing and `[ + ]` expanding, so no key prefix (`c:`) is drawn before their labels. The `?` at the top left of the terminal's pane lists these keys. `Esc` closes it, from the pane or from an idle, empty prompt.
-  - On the terminal each run takes four rows: name; model, effort and tier (`Opus 5.5 high | careful`, the tier in the panel's language); the bar with the task's steps; then context share, tokens, cost and time.
+  - On the terminal each run takes four rows: name; model and effort (`Opus 5.5 high`); the bar with the task's steps; then context share, tokens, cost and time.
+  - A narrow pane keeps its header's buttons whole (a docked one stays within 45% of the terminal from Claude Code 2.1.305: 48 columns at 110, 53 at 120). The flow's name gives way first, and goes once fewer than 12 cells would show of it, as the band names the flow; then the word `tokens`, the token count and the time. A run's last row drops its context tokens before its time.
 - **Progress bar**: the flow's title, phase, accepted tasks out of planned, and a button with the crew size that opens the panel. It appears once something calls `progress`, sits under any other plugin's band, and steps aside 10 seconds after the flow is reported finished.
 - **Tiers** color each run and pick its crab: an agent type named after a tier (`careful`, `plugin:careful`) wins; otherwise the model decides: Fable is `fable`, Opus is `heavy` at xhigh or max effort and `careful` below, Sonnet is `medium`, Haiku is `light`. The effort is the one each model request ran at, so a run follows `CLAUDE_CODE_SUBAGENT_EFFORT` (Claude Code 2.1.316) when nothing else names a level.
-- **Heavy tasks at xhigh**: a run whose description matches a task planned `heavy` runs each model request at xhigh effort (max stays max), above `CLAUDE_CODE_SUBAGENT_EFFORT` and the session's level, so it reads `heavy`. From Claude Code 2.1.309, and not while `CLAUDE_CODE_EFFORT_LEVEL` forces one level. The `heavyEffort` setting turns it off.
+- **Heavy tasks at xhigh**: a run whose description matches a task planned `heavy` runs each model request at xhigh effort (max stays max), above `CLAUDE_CODE_SUBAGENT_EFFORT` and the session's level, so it shows the `heavy` crab and color. From Claude Code 2.1.309, and not while `CLAUDE_CODE_EFFORT_LEVEL` forces one level. The `heavyEffort` setting turns it off.
 
 ## Tools and skill
 
 - `mcp__agents-progress__progress`: the delegating session reports the plan, phase and accepted tasks.
-- `mcp__agents-progress__step`: a subagent reports its own steps (`done`, `total`, `note`). From Claude Code 2.1.293 it is listed from the first prompt, so a subagent calls it without a ToolSearch first. The mod adds a paragraph asking for it to every subagent's prompt, except a workflow's agents, and names ToolSearch in it only on an older engine; a run that does not report shows its context fill in grey.
+- `mcp__agents-progress__step`: a subagent reports its own steps (`done`, `total`, `note`). From Claude Code 2.1.293 it is listed from the first prompt, so a subagent calls it without a ToolSearch first. The mod adds a paragraph asking for it to every subagent's prompt, a workflow's agents included from Claude Code 2.1.300 (before it, as in a desktop app whose engine is older, they keep their prompts as the script wrote them), and names ToolSearch in it only on an engine before 2.1.293; a run that does not report shows its context fill in grey.
 - Neither tool draws a row in the transcript, as the band and the panel show what they report; a call that failed still shows.
 - Skill `agents-progress:reportar-progresso`: Claude loads it before any delegation to report the plan and each accepted task. It is not in the `/` menu.
 
@@ -27,7 +28,7 @@ Cost is a rough estimate from token counts and the `PRICES` table in `hooks/regi
 Set them in `/config`.
 
 - `language`: `auto` (default), `en`, `pt` or `ru`.
-- `stepBrief`: `on` (default) briefs every subagent to report its steps; `off` leaves prompts as written. Each report is one more model request in the subagent.
+- `stepBrief`: `on` (default) briefs every subagent to report its steps, a workflow's agents included; `agents` briefs only the subagents the Agent tool starts, leaving a workflow script's prompts as written; `off` leaves every prompt as written. Each report is one more model request in the subagent, so a workflow of many agents pays it many times over: pick `agents` to spare it.
 - `heavyEffort`: `on` (default) runs the subagents of tasks planned `heavy` at xhigh effort; `off` leaves their effort as Claude Code picks it. xhigh costs more tokens per request.
 
 ## Install
