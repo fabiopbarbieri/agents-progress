@@ -41,6 +41,8 @@ export type AgentRun = {
   parentId?: string
   /** Set when a workflow script's `agent()` started it: its run and place in it, from 1. */
   workflow?: { runId: string; index: number }
+  /** The tier of the planned task this run matched when it started (`heavy` runs at xhigh effort); absent when none matched. */
+  plannedTier?: string
   /** Self-reported by the worker through the `step` tool. */
   stepDone?: number
   stepTotal?: number

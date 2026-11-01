@@ -32,6 +32,16 @@
         "agents",
         "off"
       ]
+    },
+    "heavyEffort": {
+      "type": "string",
+      "title": "Run heavy tasks at xhigh effort",
+      "description": "on runs every subagent of a task planned heavy at xhigh effort, above CLAUDE_CODE_SUBAGENT_EFFORT and the session's level; off leaves its effort as Claude Code picks it",
+      "default": "on",
+      "options": [
+        "on",
+        "off"
+      ]
     }
   },
   "license": "MIT"

@@ -51,3 +51,23 @@ test('step is listed from the first prompt where the engine can list it; progres
     expect(of('progress')?.isDeferred).toBeUndefined()
   }
 })
+
+test('the brief names ToolSearch only where step sits behind tool search', async ($, on) => {
+  mock.clock(on, { now: 1000 })
+  let release = ''
+  const prompts = recording(on)
+  on('session.version', async () => ({ value: { version: release, base: release } }) as never)
+  on('settings.read', async () => ({ value: {} }) as never)
+  on('env.get', async () => ({ value: undefined }) as never)
+  on('session.start', async (_$, e) => ({ cwd: e.cwd }))
+  on('tool.register', async (_$, e) => ({ value: { tool: `mcp__agents-progress__${(e as { name: string }).name}` } }) as never)
+  // 2.1.309 is the desktop app's engine in Desktop 4.4212; 2.1.292 is before isDeferred.
+  for (const [at, isListed] of [['2.1.309', true], ['2.1.292', false]] as const) {
+    release = at
+    await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as never)
+    await $.agent.spawn(spawn(at) as never)
+    const prompt = prompts.at(-1) ?? ''
+    expect(prompt).toStartWith('do it\n\nReport your progress with `mcp__agents-progress__step`: right after')
+    expect(prompt.includes('ToolSearch')).toBe(!isListed)
+  }
+})

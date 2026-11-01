@@ -168,6 +168,12 @@ let lang: Lang = 'en'
 // $.ui.view came with Claude Code 2.1.300; the desktop app runs its own engine, which
 // may lag. Set in session.start, as lang is.
 let canView = true
+// Whether `step` is listed from the first prompt (LISTED_SINCE). Until session.start
+// says so, the brief keeps its ToolSearch hint, which costs nothing where it is listed.
+let isStepListed = false
+// Whether a heavy task's requests can be raised: an engine that applies a hook's
+// effort, and no CLAUDE_CODE_EFFORT_LEVEL forcing one level on every request.
+let canRaise = false
 // Before Claude Code 2.1.300 agent.spawn could only refuse a workflow agent, not rewrite
 // its prompt. Set in session.start, as canView is.
 let canBriefWorkflow = true
@@ -176,6 +182,12 @@ const VIEW_SINCE = [2, 1, 300]
 const WF_BRIEF_SINCE = [2, 1, 300]
 // `isDeferred` on $.tool.register came with 2.1.293.
 const LISTED_SINCE = [2, 1, 293]
+// A turn.step hook's `effort` reaches the request from 2.1.309 at least, the desktop
+// app's engine in Desktop 4.4212; the oldest engine it was tried on.
+const RAISE_SINCE = [2, 1, 309]
+// The level a heavy task runs at, and the levels already at or above it.
+const HEAVY_EFFORT = 'xhigh'
+const AT_HEAVY = new Set(['xhigh', 'max'])
 
 async function engineSince($: EngineInterface, release: number[]): Promise<boolean> {
   try {
@@ -254,11 +266,13 @@ const merge = (prev: Flow | null, input: ProgressInput): Flow => {
 // What every subagent's brief gets, so the pane draws the task's own bar instead of
 // its context fill. In English, as the tools' own descriptions are.
 const STEP_BRIEF =
-  'Report your progress with `mcp__agents-progress__step` (if it is listed only by name, load it first with ' +
-  'ToolSearch `select:mcp__agents-progress__step`): right after reading this brief, call it with `total` (your plan ' +
-  'in 3 to 8 steps) and `done: 0`; call it again with the new `done` and a short `note` as each step finishes.'
+  'Report your progress with `mcp__agents-progress__step`: right after reading this brief, call it with `total` ' +
+  '(your plan in 3 to 8 steps) and `done: 0`; call it again with the new `done` and a short `note` as each step finishes.'
+// Before 2.1.293 the tool sits behind tool search, listed by name only.
+const STEP_LOAD = ' If it is listed only by name, load it first with ToolSearch `select:mcp__agents-progress__step`.'
 
-const briefed = (prompt: string): string => (prompt.includes(STEP_TOOL) ? prompt : `${prompt}\n\n${STEP_BRIEF}`)
+const briefed = (prompt: string): string =>
+  prompt.includes(STEP_TOOL) ? prompt : `${prompt}\n\n${STEP_BRIEF}${isStepListed ? '' : STEP_LOAD}`
 
 // Runs still at work. The Agent tool answers as soon as a background run starts,
 // so only the runs' own status says how many are out.
@@ -1079,7 +1093,8 @@ export const register: Register = (on, options) => {
                 tier: {
                   type: 'string',
                   enum: ['fable', 'heavy', 'careful', 'medium', 'light'],
-                  description: 'The model the task runs on: fable = Fable, heavy and careful = Opus, medium = Sonnet, light = Haiku.',
+                  description:
+                    'The model the task runs on: fable = Fable, heavy = Opus for hard work (the panel runs it at xhigh effort), careful = Opus for delicate work, medium = Sonnet, light = Haiku.',
                 },
                 after: { type: 'array', items: { type: 'integer' }, description: 'Numbers of the tasks this one waits for.' },
               },
@@ -1091,9 +1106,11 @@ export const register: Register = (on, options) => {
     })
     // Every briefed subagent calls `step` first thing: listed from the start, it needs no
     // ToolSearch round first. `progress` stays behind tool search, loaded by the skill.
-    const listed = (await engineSince($, LISTED_SINCE)) ? { isDeferred: false } : {}
+    isStepListed = await engineSince($, LISTED_SINCE)
+    const forced = String((await $.env.get('CLAUDE_CODE_EFFORT_LEVEL')) ?? '').trim().toLowerCase()
+    canRaise = (await engineSince($, RAISE_SINCE)) && (forced === '' || forced === 'auto' || forced === 'unset')
     await $.tool.register({
-      ...listed,
+      ...(isStepListed ? { isDeferred: false } : {}),
       name: 'step',
       description:
         'For subagents: report progress on your own task to the agents panel. ' +
@@ -1183,6 +1200,9 @@ export const register: Register = (on, options) => {
       startTicker($)
       return started
     }
+    // The planned task this run carries out, matched as the pane matches it: by title.
+    const planned = await read($, flow)
+    const plannedTier = wf || !planned || planned.isFinished ? undefined : planned.tasks.find(t => norm(t.title) === norm(e.description))?.tier
     await update($, agents, all => {
       const round = wf ? 1 : 1 + all.filter(a => a.id !== id && e.description && norm(a.description) === norm(e.description)).length
       const run: AgentRun = {
@@ -1192,6 +1212,7 @@ export const register: Register = (on, options) => {
         description: e.description,
         ...(e.parentAgentId ? { parentId: e.parentAgentId } : {}),
         ...(wf ? { workflow: { runId: wf.runId, index: wf.agentIndex } } : {}),
+        ...(plannedTier ? { plannedTier } : {}),
         model: started.model,
         status: 'running',
         startedAt: at,
@@ -1246,10 +1267,18 @@ export const register: Register = (on, options) => {
     return started
   })
 
-  // Each model request of a subagent: live context, tokens and cost.
+  // Each model request of a subagent: live context, tokens and cost. A task planned
+  // heavy runs at xhigh, above CLAUDE_CODE_SUBAGENT_EFFORT (2.1.316) and the session's.
   on('turn.step', async function* ($, e, next) {
-    const result = yield* next(e)
     const agentId = e.agentId
+    const isRaised =
+      !!agentId &&
+      canRaise &&
+      options.heavyEffort !== 'off' &&
+      typeof e.effort === 'string' &&
+      !AT_HEAVY.has(e.effort) &&
+      (await read($, agents)).some(a => a.agentId === agentId && a.plannedTier === 'heavy')
+    const result = yield* next(isRaised ? { ...e, effort: HEAVY_EFFORT } : e)
     const usage = result.usage
     if (!agentId || !usage) return result
 
@@ -1261,7 +1290,7 @@ export const register: Register = (on, options) => {
           : {
               ...a,
               model,
-              effort: typeof e.effort === 'string' ? e.effort : a.effort,
+              effort: isRaised ? HEAVY_EFFORT : typeof e.effort === 'string' ? e.effort : a.effort,
               status: 'running',
               endedAt: undefined,
               contextTokens:
