@@ -14,6 +14,12 @@ All notable changes to agents-progress. The project follows [Semantic Versioning
 - The desktop pane draws no `View` button, and each run's drawing takes the room it left. The desktop app (4.4212.0, engine 2.1.309) answers every press with `no main view here`, since its main view does not switch to an agent. The terminal keeps the press on the run's title.
 - A run names only its model and effort (`Opus 5.5 high`), no longer its tier in words: on the terminal the `| careful` after them is gone, and on the desktop the word before the model, on runs and planned tasks alike. The crab and the color still show the tier.
 - A workflow's agents are briefed to report their steps, as any subagent, so each one opened under its run shows its own bar instead of its context fill in grey. Claude Code 2.1.300 lets `agent.spawn` rewrite a workflow agent's prompt; on an older engine their prompts stay as the script wrote them. The run's own row still counts its agents answered out of started.
+- On the terminal, a narrow pane fits its header to its width: the flow's name goes once fewer than 12 cells would show of it (`Re…` at 110 columns), then the totals drop the word `tokens`, the token count and the time; the buttons stay whole. Claude Code 2.1.305 keeps a docked pane within 45% of the terminal, 48 columns at 110.
+- A narrow run's last row drops the context's token count before its time.
+
+### Fixed
+
+- The header's totals no longer touch its buttons (`0:13[ ○ ]`) once the flow's name is cut.
 
 ## [1.4.0] - 2026-10-31
 
