@@ -41,6 +41,8 @@ Cost is an estimate from the `PRICES` table, and tiers come from `TIER_MODEL` / 
 
 `tests/kit.ts` stands in for the engine beneath the mod: `engine(on, models, below, opens)` places panes, answers spawns with `a-<description>` agent ids, and draws an optional band underneath. `spawn`, `finishRuns`, `progress`, `BAND` and `PANE` build the events and render requests. Tests import from `claude-code/testing` (`test`, `expect`, `mock.clock`), mount with `$.ui.mount({ plugin, surface, ...PANE })`, and look up elements with `ui.find`. They check hook output trees, not how a surface paints them. The fixtures are partial, which is why tests are not type-checked.
 
+`tests/layout.ts` lays a terminal tree out in text (`render(tree, columns)`), so a test can read what a pane of that width shows: a framed `Button` keeps its width, a `Box` or `Text` gives way, `truncate-end` cuts with `…`, and the rest is clipped at the edge. It was checked against the 2.1.316 terminal, not guaranteed by the engine.
+
 ## Skill
 
 `skills/reportar-progresso/SKILL.md` is written in pt-BR and set to `user-invocable: false`. It tells the delegating session when to call `progress`. A task's `title` must match the Agent `description` word for word, because that match is how the pane pairs runs with planned tasks. Keep it consistent with the tool schema in `session.start`.

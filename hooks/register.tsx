@@ -806,6 +806,25 @@ const ctxBar = (pct: number, width: number): string => {
   return '█'.repeat(filled) + '░'.repeat(Math.max(0, width - filled))
 }
 
+// Cells a string takes on the terminal: CJK and emoji take two.
+const cellsOf = (s: string): number =>
+  [...s].reduce((w, ch) => w + (/[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]|\p{Extended_Pictographic}/u.test(ch) ? 2 : 1), 0)
+
+// Since Claude Code 2.1.305 a docked pane takes at most 45% of the terminal, and at
+// least 24 columns: 48 to 70 by default from 110 columns. The header keeps its buttons
+// whole and gives way in this order: the flow's name, the word `tokens`, the token
+// count, the time. A name left fewer cells than this is dropped rather than cut to `R…`.
+const PANE_MIN_COLS = 24
+const TITLE_MIN = 12
+
+// The header's totals, widest first: each drops one more of them.
+const totalsTiers = (t: { cost: number; tokens: number; time: number }, word: string): string[] => {
+  const cost = `≈${fmtCost(t.cost)}`
+  const tokens = fmtTokens(t.tokens)
+  const time = fmtTime(t.time)
+  return [`${cost} · ${tokens} ${word} · ${time}`, `${cost} · ${tokens} · ${time}`, `${cost} · ${time}`, cost]
+}
+
 // The pane draws the latest finished runs; the totals still count every run.
 const FINISHED_SHOWN = 10
 
@@ -1462,7 +1481,7 @@ export const register: Register = (on, options) => {
     }
 
     // Terminal: the same content in text rows.
-    const cols = Math.max(24, e.props.bodyColumns || 40)
+    const cols = Math.max(PANE_MIN_COLS, e.props.bodyColumns || 40)
     const barW = Math.max(6, Math.min(20, cols - 34))
     const row = ({ a, depth }: Nested) => {
       const isViewed = !!a.agentId && a.agentId === viewed
@@ -1475,6 +1494,12 @@ export const register: Register = (on, options) => {
       // The bar and the task's own steps on one row, the run's numbers on the next:
       // one row held both, and a step's note truncated them.
       const steps = stepsOf(a, ' · ')
+      // The numbers row, narrowed before it is cut: the context's tokens (its share
+      // stays) or a workflow's word `tokens` go first, so the time stays in sight.
+      const room = cols - 2 * Math.min(depth, MAX_DEPTH) - 2
+      const tail = ` · ≈${fmtCost(a.costUsd)} · ${fmtTime(elapsed(a, at))}`
+      const head = g ? `${fmtTokens(a.tokens)} ${s.tokensWord}` : `${ctx}% · ${fmtTokens(a.contextTokens)}`
+      const numbers = cellsOf(head + tail) <= room ? head + tail : (g ? fmtTokens(a.tokens) : `${ctx}%`) + tail
       return (
         <Box key={a.id} flexDirection="column" marginBottom={1} paddingLeft={2 * Math.min(depth, MAX_DEPTH)}>
           <Box flexDirection="row" gap={1}>
@@ -1514,8 +1539,7 @@ export const register: Register = (on, options) => {
           {!p.isSimple && (
             <Text dimColor wrap="truncate-end">
               {'  '}
-              {g ? `${fmtTokens(a.tokens)} ${s.tokensWord}` : `${ctx}% · ${fmtTokens(a.contextTokens)}`} · ≈{fmtCost(a.costUsd)} ·{' '}
-              {fmtTime(elapsed(a, at))}
+              {numbers}
             </Text>
           )}
         </Box>
@@ -1553,13 +1577,21 @@ export const register: Register = (on, options) => {
       </Box>
     ) : null
 
+    // One row: the ?, the flow's name, the totals, a cell, the buttons. The name keeps
+    // the full totals while it has TITLE_MIN cells, then the shorter ones; below that it
+    // goes (the band above the prompt names the flow), and the totals narrow to fit.
+    const tiers = totalsTiers(t, s.tokensWord)
+    const room = cols - 5 - 1 - 1 - (p.isCompact ? 5 : 11)
+    const titleMin = Math.min(TITLE_MIN, cellsOf(title))
+    const withTitle = title ? tiers.slice(0, 2).find(x => room - cellsOf(x) - 1 >= titleMin) : undefined
+    const totalsText = withTitle ?? tiers.find(x => cellsOf(x) <= room) ?? tiers[tiers.length - 1]!
+
     return (
       <Box flexDirection="column">
-        <Box flexDirection="row" justifyContent="space-between">
-          {/* One row: the ?, the flow's name, the totals; the name gives way first. */}
+        <Box flexDirection="row" justifyContent="space-between" gap={1}>
           <Box flexDirection="row" gap={1} flexShrink={1}>
             {toggleHelp}
-            {title ? (
+            {withTitle ? (
               <Box flexShrink={1}>
                 <Text bold wrap="truncate-end">
                   {title}
@@ -1567,9 +1599,7 @@ export const register: Register = (on, options) => {
               </Box>
             ) : null}
             <Box flexShrink={0}>
-              <Text dimColor>
-                ≈{fmtCost(t.cost)} · {fmtTokens(t.tokens)} {s.tokensWord} · {fmtTime(t.time)}
-              </Text>
+              <Text dimColor>{totalsText}</Text>
             </Box>
           </Box>
           <Box flexDirection="row" gap={1} flexShrink={0}>
