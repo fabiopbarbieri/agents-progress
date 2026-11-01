@@ -10,7 +10,8 @@ A Claude Code mod, forked from [savvy-progress](https://github.com/johnnyvizz/cl
   - With the pane focused, `c` collapses it, `f` folds the finished runs and `e` opens the earlier ones. On the terminal, `s` (`[ ○ ]`) keeps each run to its name and bar, without the grey rows; press it again (`[ ● ]`) for the details. There the buttons are framed, `[ − ]` collapsing and `[ + ]` expanding, so no key prefix (`c:`) is drawn before their labels. The `?` at the top left of the terminal's pane lists these keys. `Esc` closes it, from the pane or from an idle, empty prompt.
   - On the terminal each run takes four rows: name; model, effort and tier (`Opus 5.5 high | careful`, the tier in the panel's language); the bar with the task's steps; then context share, tokens, cost and time.
 - **Progress bar**: the flow's title, phase, accepted tasks out of planned, and a button with the crew size that opens the panel. It appears once something calls `progress`, sits under any other plugin's band, and steps aside 10 seconds after the flow is reported finished.
-- **Tiers** color each run and pick its crab: an agent type named after a tier (`careful`, `plugin:careful`) wins; otherwise the model decides: Fable is `fable`, Opus is `heavy` at xhigh or max effort and `careful` below, Sonnet is `medium`, Haiku is `light`.
+- **Tiers** color each run and pick its crab: an agent type named after a tier (`careful`, `plugin:careful`) wins; otherwise the model decides: Fable is `fable`, Opus is `heavy` at xhigh or max effort and `careful` below, Sonnet is `medium`, Haiku is `light`. The effort is the one each model request ran at, so a run follows `CLAUDE_CODE_SUBAGENT_EFFORT` (Claude Code 2.1.316) when nothing else names a level.
+- **Heavy tasks at xhigh**: a run whose description matches a task planned `heavy` runs each model request at xhigh effort (max stays max), above `CLAUDE_CODE_SUBAGENT_EFFORT` and the session's level, so it reads `heavy`. From Claude Code 2.1.309, and not while `CLAUDE_CODE_EFFORT_LEVEL` forces one level. The `heavyEffort` setting turns it off.
 
 ## Tools and skill
 
@@ -27,6 +28,7 @@ Set them in `/config`.
 
 - `language`: `auto` (default), `en`, `pt` or `ru`.
 - `stepBrief`: `on` (default) briefs every subagent to report its steps; `off` leaves prompts as written. Each report is one more model request in the subagent.
+- `heavyEffort`: `on` (default) runs the subagents of tasks planned `heavy` at xhigh effort; `off` leaves their effort as Claude Code picks it. xhigh costs more tokens per request.
 
 ## Install
 

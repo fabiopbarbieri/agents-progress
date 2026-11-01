@@ -4,6 +4,11 @@ All notable changes to agents-progress. The project follows [Semantic Versioning
 
 ## [Unreleased]
 
+### Added
+
+- A task planned `heavy` runs at xhigh effort: each model request of a run whose description matches it is raised to xhigh (max stays max), and the run reads `heavy`. Since Claude Code 2.1.316, `CLAUDE_CODE_SUBAGENT_EFFORT` sets the effort of a subagent no one names a level for, and an Opus run below xhigh read `careful`, so a task planned `heavy` drew as `careful` once it ran. It needs Claude Code 2.1.309 or later, the desktop app's engine included, and stands aside while `CLAUDE_CODE_EFFORT_LEVEL` forces one level. The new `heavyEffort` setting (`on` by default) turns it off.
+- `AgentRun.plannedTier` in the state: the tier of the planned task a run matched when it started.
+
 ### Changed
 
 - The step brief added to each subagent's prompt no longer tells it how to load `mcp__agents-progress__step` with ToolSearch where the tool is listed from the first prompt (Claude Code 2.1.293 and later, the desktop app's 2.1.309 engine included). An older engine keeps the hint.

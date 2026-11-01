@@ -17,6 +17,7 @@ Chame `mcp__agents-progress__progress` nestes momentos. Campos omitidos mantêm 
 1. Antes da primeira chamada ao Agent, já com o plano: `title` (poucas palavras), `phase: "delegate"`, `tasks` em ordem. Um único subagente é um plano de uma tarefa.
    - O `title` de cada tarefa é idêntico, palavra por palavra, à `description` que você vai passar à ferramenta Agent; é assim que o painel associa uma execução à sua tarefa.
    - `tier` indica o modelo em que a tarefa roda: `fable` = Fable, `heavy` = Opus para trabalho difícil, `careful` = Opus para trabalho delicado, `medium` = Sonnet, `light` = Haiku.
+   - Não passe `effort` à ferramenta Agent. O mod roda em xhigh as tarefas `heavy`, a menos que a pessoa desligue a opção `heavyEffort` em `/config`, e as outras seguem o esforço que o Claude Code escolhe.
    - `after` lista os números (a partir de 1) das tarefas pelas quais ela espera.
 2. A cada resultado de tarefa aceito: `done` com o total aceito até agora.
 3. Numa mudança de fase (`plan`, `design`, `delegate`, `review`, `close`) ou num replanejamento: `phase`, ou as novas `tasks`.
