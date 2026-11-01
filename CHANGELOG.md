@@ -2,6 +2,12 @@
 
 All notable changes to agents-progress. The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); see *Versioning* in the README.
 
+## [Unreleased]
+
+### Changed
+
+- The step brief added to each subagent's prompt no longer tells it how to load `mcp__agents-progress__step` with ToolSearch where the tool is listed from the first prompt (Claude Code 2.1.293 and later, the desktop app's 2.1.309 engine included). An older engine keeps the hint.
+
 ## [1.4.0] - 2026-10-31
 
 ### Fixed

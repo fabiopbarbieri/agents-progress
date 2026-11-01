@@ -174,6 +174,9 @@ let lang: Lang = 'en'
 // $.ui.view came with Claude Code 2.1.300; the desktop app runs its own engine, which
 // may lag. Set in session.start, as lang is.
 let canView = true
+// Whether `step` is listed from the first prompt (LISTED_SINCE). Until session.start
+// says so, the brief keeps its ToolSearch hint, which costs nothing where it is listed.
+let isStepListed = false
 
 const VIEW_SINCE = [2, 1, 300]
 // `isDeferred` on $.tool.register came with 2.1.293.
@@ -256,12 +259,13 @@ const merge = (prev: Flow | null, input: ProgressInput): Flow => {
 // What every subagent's brief gets, so the pane draws the task's own bar instead of
 // its context fill. In English, as the tools' own descriptions are.
 const STEP_BRIEF =
-  'Report your progress with `mcp__agents-progress__step` (if it is listed only by name, load it first with ' +
-  'ToolSearch `select:mcp__agents-progress__step`): right after reading this brief, call it with `total` (your plan ' +
-  'in 3 to 8 steps) and `done: 0`; call it again with the new `done` and a short `note` as each step finishes.'
+  'Report your progress with `mcp__agents-progress__step`: right after reading this brief, call it with `total` ' +
+  '(your plan in 3 to 8 steps) and `done: 0`; call it again with the new `done` and a short `note` as each step finishes.'
+// Before 2.1.293 the tool sits behind tool search, listed by name only.
+const STEP_LOAD = ' If it is listed only by name, load it first with ToolSearch `select:mcp__agents-progress__step`.'
 
 const briefed = (prompt: string, isOn: boolean): string =>
-  !isOn || prompt.includes(STEP_TOOL) ? prompt : `${prompt}\n\n${STEP_BRIEF}`
+  !isOn || prompt.includes(STEP_TOOL) ? prompt : `${prompt}\n\n${STEP_BRIEF}${isStepListed ? '' : STEP_LOAD}`
 
 // Runs still at work. The Agent tool answers as soon as a background run starts,
 // so only the runs' own status says how many are out.
@@ -1071,9 +1075,9 @@ export const register: Register = (on, options) => {
     })
     // Every briefed subagent calls `step` first thing: listed from the start, it needs no
     // ToolSearch round first. `progress` stays behind tool search, loaded by the skill.
-    const listed = (await engineSince($, LISTED_SINCE)) ? { isDeferred: false } : {}
+    isStepListed = await engineSince($, LISTED_SINCE)
     await $.tool.register({
-      ...listed,
+      ...(isStepListed ? { isDeferred: false } : {}),
       name: 'step',
       description:
         'For subagents: report progress on your own task to the agents panel. ' +
