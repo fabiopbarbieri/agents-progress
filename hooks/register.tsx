@@ -188,6 +188,8 @@ const RAISE_SINCE = [2, 1, 309]
 // The level a heavy task runs at, and the levels already at or above it.
 const HEAVY_EFFORT = 'xhigh'
 const AT_HEAVY = new Set(['xhigh', 'max'])
+// Raising heavy tasks is opt-in: `heavyEffort` is off unless set to `on`.
+const isHeavyOn = (options: { heavyEffort?: unknown }): boolean => options.heavyEffort === 'on'
 
 async function engineSince($: EngineInterface, release: number[]): Promise<boolean> {
   try {
@@ -1094,7 +1096,7 @@ export const register: Register = (on, options) => {
                   type: 'string',
                   enum: ['fable', 'heavy', 'careful', 'medium', 'light'],
                   description:
-                    'The model the task runs on: fable = Fable, heavy = Opus for hard work (the panel runs it at xhigh effort), careful = Opus for delicate work, medium = Sonnet, light = Haiku.',
+                    `The model the task runs on: fable = Fable, heavy = Opus for hard work${isHeavyOn(options) ? ' (the panel runs it at xhigh effort)' : ''}, careful = Opus for delicate work, medium = Sonnet, light = Haiku.`,
                 },
                 after: { type: 'array', items: { type: 'integer' }, description: 'Numbers of the tasks this one waits for.' },
               },
@@ -1267,14 +1269,14 @@ export const register: Register = (on, options) => {
     return started
   })
 
-  // Each model request of a subagent: live context, tokens and cost. A task planned
-  // heavy runs at xhigh, above CLAUDE_CODE_SUBAGENT_EFFORT (2.1.316) and the session's.
+  // Each model request of a subagent: live context, tokens and cost. With heavyEffort on,
+  // a task planned heavy runs at xhigh, above CLAUDE_CODE_SUBAGENT_EFFORT (2.1.316) and the session's.
   on('turn.step', async function* ($, e, next) {
     const agentId = e.agentId
     const isRaised =
       !!agentId &&
       canRaise &&
-      options.heavyEffort !== 'off' &&
+      isHeavyOn(options) &&
       typeof e.effort === 'string' &&
       !AT_HEAVY.has(e.effort) &&
       (await read($, agents)).some(a => a.agentId === agentId && a.plannedTier === 'heavy')

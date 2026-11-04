@@ -2,6 +2,12 @@
 
 All notable changes to agents-progress. The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); see *Versioning* in the README.
 
+## [Unreleased]
+
+### Changed
+
+- `heavyEffort` is `off` by default: the mod no longer raises the effort of any subagent unless the setting is `on`, and the `progress` tool's `tier` no longer promises xhigh for `heavy` while it is off. The `reportar-progresso` skill no longer tells the session to leave `effort` out of the Agent call: it passes one as it would without the mod, and only `heavyEffort` on raises a `heavy` task to xhigh over it. Set `heavyEffort` to `on` in `/config` to keep the 1.5.0 behaviour.
+
 ## [1.5.0] - 2026-11-01
 
 ### Added

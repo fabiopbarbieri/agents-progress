@@ -59,6 +59,8 @@ const desktopRows = async ($: any): Promise<Record<string, [string | undefined, 
   return out
 }
 
+const ON = { options: { heavyEffort: 'on' } }
+
 type Heavy = { release?: string; forced?: string; effort?: string }
 
 // A flow planning `task 1` heavy and `task 2` careful, both run on Opus; each
@@ -92,28 +94,32 @@ const heavyFlow = async ($: any, on: any, { release = '2.1.316', forced, effort 
   return sent
 }
 
-test('a task planned heavy runs at xhigh, wearing the heavy crab; the others keep their effort', async ($, on) => {
+test('a task planned heavy runs at xhigh, wearing the heavy crab; the others keep their effort', ON, async ($, on) => {
   const sent = await heavyFlow($, on)
   expect(sent).toEqual({ 'a-task 1': 'xhigh', 'a-task 2': 'medium' })
   expect(await desktopRows($)).toEqual({ 'task 1': ['heavy', 'Opus 5.5 · xhigh'], 'task 2': ['careful', 'Opus 5.5 · medium'] })
 })
 
-test('a heavy task already at max stays at max', async ($, on) => {
+test('a heavy task already at max stays at max', ON, async ($, on) => {
   expect((await heavyFlow($, on, { effort: 'max' }))['a-task 1']).toBe('max')
+})
+
+test('heavyEffort left unset leaves a heavy task at the effort Claude Code picked', async ($, on) => {
+  expect((await heavyFlow($, on))['a-task 1']).toBe('medium')
 })
 
 test('heavyEffort off leaves a heavy task at the effort Claude Code picked', { options: { heavyEffort: 'off' } }, async ($, on) => {
   expect((await heavyFlow($, on))['a-task 1']).toBe('medium')
 })
 
-test('an engine before 2.1.309 is not asked for another effort', async ($, on) => {
+test('an engine before 2.1.309 is not asked for another effort', ON, async ($, on) => {
   expect((await heavyFlow($, on, { release: '2.1.308' }))['a-task 1']).toBe('medium')
 })
 
-test('CLAUDE_CODE_EFFORT_LEVEL forcing a level keeps a heavy task at it', async ($, on) => {
+test('CLAUDE_CODE_EFFORT_LEVEL forcing a level keeps a heavy task at it', ON, async ($, on) => {
   expect((await heavyFlow($, on, { forced: 'high' }))['a-task 1']).toBe('medium')
 })
 
-test('CLAUDE_CODE_EFFORT_LEVEL auto still lets a heavy task rise', async ($, on) => {
+test('CLAUDE_CODE_EFFORT_LEVEL auto still lets a heavy task rise', ON, async ($, on) => {
   expect((await heavyFlow($, on, { forced: 'auto' }))['a-task 1']).toBe('xhigh')
 })
