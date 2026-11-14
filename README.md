@@ -86,6 +86,8 @@ With the pane focused:
 | `?` | List these keys (the button at the pane's top left) | terminal |
 | `Esc` | Close the pane, from the pane or from an idle, empty prompt | both |
 
+Docked in the terminal, the pane's header starts with a `[ × ]` that closes it. Claude Code draws its own close mark in the terminal's top-right corner, where a host that draws its own controls over the terminal (Orca, for one) can hide it. A pane too narrow for both the button and its shortest totals leaves the button out; `Esc` and `ctrl+x x` still close it.
+
 In the terminal the keyed buttons are framed, so no key prefix (`c:`) is drawn before their labels. While a dialog or a field above the prompt covers the prompt, the `?` help says to focus the pane once the prompt is free (Claude Code 2.1.323).
 
 <details>
