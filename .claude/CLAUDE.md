@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-agents-progress is a Claude Code mod: a progress band above the prompt and an agents pane (`/agents-info`). The README is the source of truth for user-facing behaviour, settings, install and SemVer rules. Keep it in step with every behaviour change.
+agents-progress is a Claude Code mod: a progress band above the prompt and an agents pane (`/agents-info`). The README is the source of truth for user-facing behaviour, settings, install and SemVer rules. Keep it in step with every behaviour change, and `README.pt-BR.md` in step with it: same sections, same facts. The pictures in `assets/` show the pane and the band for a sample flow: when either changes look, redraw them with `scripts/readme-images/build.sh`.
 
 ## Checks
 

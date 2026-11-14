@@ -2,6 +2,13 @@
 
 All notable changes to agents-progress. The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); see *Versioning* in the README.
 
+## [Unreleased]
+
+### Documentation
+
+- The README is rewritten: a header with the icon, pictures of the pane and the band in the terminal and in the desktop app (light and dark), a short "how it works", and tables for the keys, tiers, settings, tools and the Claude Code versions each feature needs. The pictures, in `assets/`, are drawn from the mod's own output for a sample flow by `scripts/readme-images/build.sh`.
+- A Brazilian Portuguese README, `README.pt-BR.md`, linked from the top of the English one.
+
 ## [1.7.0] - 2026-11-14
 
 ### Added
