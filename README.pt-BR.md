@@ -88,6 +88,8 @@ Com o painel em foco:
 | `?` | Lista estas teclas (o botão no canto superior esquerdo do painel) | terminal |
 | `Esc` | Fecha o painel, a partir do painel ou de um prompt ocioso e vazio | ambos |
 
+Encaixado no terminal, o cabeçalho do painel começa com um `[ × ]` que o fecha. O Claude Code desenha a própria marca de fechar no canto superior direito do terminal, onde um host que desenha controles por cima do terminal (o Orca, por exemplo) pode escondê-la. Um painel estreito demais para o botão e os totais mais curtos deixa o botão de fora; `Esc` e `ctrl+x x` continuam fechando.
+
 No terminal os botões com tecla vêm emoldurados, então nenhum prefixo de tecla (`c:`) aparece antes dos rótulos. Enquanto um diálogo ou um campo acima do prompt cobre o prompt, a ajuda do `?` diz para focar o painel quando o prompt estiver livre (Claude Code 2.1.323).
 
 <details>

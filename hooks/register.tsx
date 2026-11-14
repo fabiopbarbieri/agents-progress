@@ -1621,7 +1621,12 @@ export const register: Register = (on, options) => {
     // the full totals while it has TITLE_MIN cells, then the shorter ones; below that it
     // goes (the band above the prompt names the flow), and the totals narrow to fit.
     const tiers = totalsTiers(t, s.tokensWord)
-    const room = cols - 5 - 1 - 1 - (p.isCompact ? 5 : 11)
+    const buttonsRoom = cols - 5 - 1 - 1 - (p.isCompact ? 5 : 11)
+    // Docked, the engine's close mark sits in the terminal's top-right corner, where a host
+    // that draws its own tab controls over the terminal (Orca) can hide it: the header
+    // starts with a close of the pane's own, while the shortest totals still fit beside it.
+    const closeHere = e.props.placement === 'dock' && buttonsRoom - 6 >= cellsOf(tiers[tiers.length - 1]!)
+    const room = buttonsRoom - (closeHere ? 6 : 0)
     const titleMin = Math.min(TITLE_MIN, cellsOf(title))
     const withTitle = title ? tiers.slice(0, 2).find(x => room - cellsOf(x) - 1 >= titleMin) : undefined
     const totalsText = withTitle ?? tiers.find(x => cellsOf(x) <= room) ?? tiers[tiers.length - 1]!
@@ -1630,6 +1635,7 @@ export const register: Register = (on, options) => {
       <Box flexDirection="column">
         <Box flexDirection="row" justifyContent="space-between" gap={1}>
           <Box flexDirection="row" gap={1} flexShrink={1}>
+            {closeHere && <Button key="close" label="×" role="dismiss" onPress={() => $.ui.close({ id: PANE })} />}
             {toggleHelp}
             {withTitle ? (
               <Box flexShrink={1}>

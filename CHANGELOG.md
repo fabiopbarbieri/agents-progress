@@ -2,6 +2,12 @@
 
 All notable changes to agents-progress. The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); see *Versioning* in the README.
 
+## [Unreleased]
+
+### Added
+
+- Docked in the terminal, the pane's header starts with a `[ × ]` that closes the pane. Claude Code draws its own close mark in the terminal's top-right corner, where a host that draws its own controls over the terminal, such as Orca, hides it. A pane too narrow for the button beside its shortest totals leaves it out; `Esc` and `ctrl+x x` still close the pane. Inline and in the desktop app the pane is unchanged.
+
 ## [1.7.1] - 2026-11-14
 
 ### Documentation

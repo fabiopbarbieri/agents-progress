@@ -8,7 +8,7 @@ import { render } from './layout'
 // less its frame: 76 at 80 columns, 96 at 100.
 const WIDTHS = [24, 32, 40, 48, 53, 70, 76, 96]
 
-const at = (w: number) => ({ ...PANE, props: { ...PANE.props, bodyColumns: w } })
+const at = (w: number, placement: 'dock' | 'inline' = 'dock') => ({ ...PANE, props: { ...PANE.props, bodyColumns: w, placement } })
 
 // A flow with a long name, and a run that has reported steps and spent tokens.
 const scene = async ($: any, on: any) => {
@@ -31,19 +31,19 @@ test('at every width a pane takes, the header keeps its buttons whole, a cell af
   for (const w of WIDTHS) {
     const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...at(w) })
     const [header] = render(await ui.drawn(), w)
-    expect({ w, header }).toEqual({ w, header: expect.stringMatching(/^\[ \? \] .*\S +\[ ○ \] \[ − \]$/) })
+    expect({ w, header }).toEqual({ w, header: expect.stringMatching(/^(\[ × \] )?\[ \? \] .*\S +\[ ○ \] \[ − \]$/) })
     await ui.press({ key: 'compact' })
     const [compact] = render(await ui.drawn(), w)
-    expect({ w, compact }).toEqual({ w, compact: expect.stringMatching(/^\[ \? \] .*\S +\[ \+ \]$/) })
+    expect({ w, compact }).toEqual({ w, compact: expect.stringMatching(/^(\[ × \] )?\[ \? \] .*\S +\[ \+ \]$/) })
     await ui.press({ key: 'compact' })
     await ui.unmount()
   }
 })
 
-test("the header drops the flow's name before its totals, then the totals narrow", async ($, on) => {
+test("inline, the header drops the flow's name before its totals, then the totals narrow", async ($, on) => {
   await scene($, on)
   const header = async (w: number) => {
-    const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...at(w) })
+    const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...at(w, 'inline') })
     const [line] = render(await ui.drawn(), w)
     await ui.unmount()
     return line
@@ -57,6 +57,42 @@ test("the header drops the flow's name before its totals, then the totals narrow
   expect(await header(40)).toMatch(/^\[ \? \] ≈\$0\.63 · 489k · 0:00 +\[ ○ \]/)
   expect(await header(32)).toMatch(/^\[ \? \] ≈\$0\.63 · 0:00 +\[ ○ \]/)
   expect(await header(24)).toBe('[ ? ] ≈$0.63 [ ○ ] [ − ]')
+})
+
+// Docked, the engine's close mark sits in the terminal's top-right corner, which a host
+// such as Orca can draw its own tab controls over.
+test('docked, the header starts with a close of its own while the shortest totals fit beside it', async ($, on) => {
+  await scene($, on)
+  const header = async (w: number, placement: 'dock' | 'inline' = 'dock') => {
+    const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...at(w, placement) })
+    const [line] = render(await ui.drawn(), w)
+    await ui.unmount()
+    return line
+  }
+  expect(await header(96)).toMatch(/^\[ × \] \[ \? \] Review the agents pane width ≈\$0\.63 · 489k tokens · 0:00 +\[ ○ \]/)
+  expect(await header(48)).toMatch(/^\[ × \] \[ \? \] ≈\$0\.63 · 489k · 0:00 +\[ ○ \]/)
+  expect(await header(32)).toMatch(/^\[ × \] \[ \? \] ≈\$0\.63 +\[ ○ \]/)
+  // Too narrow for it: Esc and ctrl+x x still close the pane.
+  expect(await header(24)).toBe('[ ? ] ≈$0.63 [ ○ ] [ − ]')
+  // Inline the frame sits above the prompt, its close mark in reach.
+  expect(await header(96, 'inline')).toMatch(/^\[ \? \] /)
+})
+
+test('the close of its own closes the pane; the desktop draws none', async ($, on) => {
+  const closed: unknown[] = []
+  on('ui.close', async (_$, e) => {
+    closed.push(e)
+    return { value: undefined }
+  })
+  await scene($, on)
+  const term = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...at(76) })
+  await term.press({ key: 'close' })
+  expect(closed).toEqual([expect.objectContaining({ id: PANE.requestId })])
+  await term.unmount()
+
+  const desk = await $.ui.mount({ plugin: 'agents-progress', surface: 'desktop', ...PANE })
+  expect(await desk.find({ type: 'Button', key: 'close' })).toBeUndefined()
+  await desk.unmount()
 })
 
 test("a narrow run row drops the context's tokens before the time", async ($, on) => {
