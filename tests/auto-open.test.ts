@@ -1,5 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
+import { PANE } from './kit'
+
 const spawn = (id: string, type: string) => ({
   tool_use_id: `tu-${id}`,
   prompt: 'do it',
@@ -47,13 +49,7 @@ test('a run with no tier in its type takes the tier of its model', async ($, on)
   for (const id of ['1', '2', '3', '4']) await $.agent.spawn(spawn(id, 'general-purpose') as never)
 
   // Neither surface names the tier in words: the desktop's crab wears its costume.
-  const ui = await $.ui.mount({
-    plugin: 'agents-progress',
-    surface: 'desktop',
-    component: 'Pane',
-    requestId: 'agents-progress',
-    props: { title: 'Agents', isFocused: false, bodyColumns: 80, placement: 'dock', scroll: undefined as never },
-  })
+  const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'desktop', ...PANE })
   const rows = await ui.findAll({ type: 'Svg' })
   const tierOf = (task: string) => String(rows.find(r => String(r.props.alt).startsWith(`${task}:`))?.props.source).match(/class="c-(\w+)/)?.[1]
   expect(['task 1', 'task 2', 'task 3', 'task 4'].map(tierOf)).toEqual(['medium', 'light', 'fable', 'careful'])

@@ -61,6 +61,7 @@ const STRINGS = {
     collapse: 'Collapse',
     expand: 'Expand',
     keysWhen: 'With the pane focused (ctrl+x tab):',
+    keysWhenCovered: 'Once the prompt is free, focus the pane (ctrl+x tab):',
     keys: { s: 'simple view', c: 'collapse', f: 'finished', e: 'earlier', m: 'main conversation', Esc: 'close' },
     running: 'Running',
     finished: 'Finished',
@@ -97,6 +98,7 @@ const STRINGS = {
     collapse: 'Recolher',
     expand: 'Expandir',
     keysWhen: 'Com o painel focado (ctrl+x tab):',
+    keysWhenCovered: 'Com o prompt livre, foque o painel (ctrl+x tab):',
     keys: { s: 'simplificar', c: 'recolher', f: 'concluídos', e: 'anteriores', m: 'conversa principal', Esc: 'fechar' },
     running: 'Em execução',
     finished: 'Concluídos',
@@ -133,6 +135,7 @@ const STRINGS = {
     collapse: 'Свернуть',
     expand: 'Развернуть',
     keysWhen: 'Когда панель в фокусе (ctrl+x tab):',
+    keysWhenCovered: 'Когда поле ввода освободится, переведите фокус на панель (ctrl+x tab):',
     keys: { s: 'упростить', c: 'свернуть', f: 'завершённые', e: 'ранее', m: 'основной разговор', Esc: 'закрыть' },
     running: 'Работают',
     finished: 'Завершены',
@@ -1590,9 +1593,15 @@ export const register: Register = (on, options) => {
         <Text color={ACCENT}>{k}</Text> <Text dimColor>{s.keys[k]}</Text>
       </Text>
     )
+    // A dialog, or a field above the prompt while the pane is not focused, covers the
+    // prompt (Claude Code 2.1.323 says so in isPromptCovered; older engines leave it out).
+    // ctrl+x tab is a prompt key, and under a dialog the engine neither focuses a pane on
+    // a click nor closes one on Esc from the prompt: point to the prompt being free first.
+    // Read through `in`: the API types an engine before 2.1.323 lays for tsc do not name the prop.
+    const isPromptCovered = 'isPromptCovered' in e.props && e.props.isPromptCovered === true
     const help = p.isHelpShown ? (
       <Box flexDirection="column" marginTop={1}>
-        <Text dimColor>{s.keysWhen}</Text>
+        <Text dimColor>{isPromptCovered ? s.keysWhenCovered : s.keysWhen}</Text>
         <Text wrap="truncate-end">
           {'  '}
           {keyPair('s')} · {keyPair('c')}

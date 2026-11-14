@@ -1,7 +1,7 @@
 import type { On } from 'claude-code'
 import { expect, mock, test } from 'claude-code/testing'
 
-import { PANE, engine, spawn } from './kit'
+import { PANE, engine, settle, spawn } from './kit'
 
 const viewing = (agentId?: string) => ({ ...PANE, props: { ...PANE.props, view: agentId ? { agentId } : {} } })
 
@@ -63,7 +63,7 @@ test('a view the engine refuses says why in a toast', async ($, on) => {
   const ui = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...viewing() })
   await ui.press({ key: 'view-a-task 1' })
   await ui.unmount()
-  await new Promise(done => setTimeout(done, 0))
+  await settle()
   expect(toasts).toEqual(['no agent holds the id'])
 })
 
@@ -99,7 +99,7 @@ test("Escape closes the pane: every open asks for it", async ($, on) => {
   on('ui.panes', async () => ({ value: [] }) as never)
   await $.agent.spawn(spawn('1') as never)
   await $.command.run({ command: 'agents-info', args: '' } as never)
-  await new Promise(done => setTimeout(done, 0))
+  await settle()
   expect(opens).toHaveLength(2)
   expect(opens.every(o => (o as { closeOnEscape?: boolean }).closeOnEscape === true)).toBe(true)
 })

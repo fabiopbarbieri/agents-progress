@@ -41,10 +41,29 @@ export const finishRuns = async ($: Runs, n: number): Promise<void> => {
 
 export const progress = (input: Record<string, unknown>) => ({ tool: 'mcp__agents-progress__progress', ...input }) as never
 
-export const BAND = { component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, bodyColumns: 100 } } as const
+// The band's render request, every prop the engine sends: the hook reads only
+// hasSurvey and bodyColumns, the rest is there for the type check.
+export const BAND = {
+  component: 'AbovePrompt',
+  props: {
+    hasSurvey: false,
+    isCollapsed: false,
+    isWorking: false,
+    maxRows: 6,
+    bodyColumns: 100,
+    scroll: { offset: 0, bodyRows: 6 },
+    view: {} as { agentId?: string },
+  },
+} as const
 
 export const PANE = {
   component: 'Pane',
   requestId: 'agents-progress',
-  props: { title: 'Agents', isFocused: false, bodyColumns: 80, placement: 'dock', scroll: undefined as never, view: {} as { agentId?: string } },
+  props: { title: 'Agents', isFocused: false, bodyColumns: 80, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} as { agentId?: string } },
 } as const
+
+// The tests' host has timers, but no DOM or Node typings name them.
+declare function setTimeout(run: () => void, ms: number): unknown
+
+// Lets work the mod left running (a void async chain, not a $.clock timer) finish.
+export const settle = (): Promise<void> => new Promise(done => setTimeout(done, 0))
