@@ -9,6 +9,9 @@
   "homepage": "https://github.com/fabiopbarbieri/agents-progress",
   "repository": "https://github.com/fabiopbarbieri/agents-progress",
   "types": "./types/index.d.ts",
+  "engines": {
+    "claude-code": ">=2.1.286"
+  },
   "userConfig": {
     "language": {
       "type": "string",

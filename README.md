@@ -7,7 +7,7 @@ A Claude Code mod, forked from [savvy-progress](https://github.com/johnnyvizz/cl
   - A run another subagent started sits right under it, indented.
   - A workflow run (the Workflow tool) is one row named after the workflow: its agents answered out of started as the bar, with their summed tokens, cost and time. Its `▸` button (the title on the terminal) opens its agents beneath it. Each agent opened beneath it shows its own steps once it reports them, and the progress bar counts the run once.
   - A run that answered and is woken again shows as running from the start of its new turn.
-  - With the pane focused, `c` collapses it, `f` folds the finished runs and `e` opens the earlier ones. On the terminal, `s` (`[ ○ ]`) keeps each run to its name and bar, without the grey rows; press it again (`[ ● ]`) for the details. There the buttons are framed, `[ − ]` collapsing and `[ + ]` expanding, so no key prefix (`c:`) is drawn before their labels. The `?` at the top left of the terminal's pane lists these keys. `Esc` closes it, from the pane or from an idle, empty prompt.
+  - With the pane focused, `c` collapses it, `f` folds the finished runs and `e` opens the earlier ones. On the terminal, `s` (`[ ○ ]`) keeps each run to its name and bar, without the grey rows; press it again (`[ ● ]`) for the details. There the buttons are framed, `[ − ]` collapsing and `[ + ]` expanding, so no key prefix (`c:`) is drawn before their labels. The `?` at the top left of the terminal's pane lists these keys; while a dialog or a field above the prompt covers the prompt, it says to focus the pane once the prompt is free (Claude Code 2.1.323). `Esc` closes it, from the pane or from an idle, empty prompt.
   - On the terminal each run takes four rows: name; model and effort (`Opus 5.5 high`); the bar with the task's steps; then context share, tokens, cost and time.
   - A narrow pane keeps its header's buttons whole (a docked one stays within 45% of the terminal from Claude Code 2.1.305: 48 columns at 110, 53 at 120). The flow's name gives way first, and goes once fewer than 12 cells would show of it, as the band names the flow; then the word `tokens`, the token count and the time. A run's last row drops its context tokens before its time.
 - **Progress bar**: the flow's title, phase, accepted tasks out of planned, and a button with the crew size that opens the panel. It appears once something calls `progress`, sits under any other plugin's band, and steps aside 10 seconds after the flow is reported finished.
@@ -22,6 +22,8 @@ A Claude Code mod, forked from [savvy-progress](https://github.com/johnnyvizz/cl
 - Skill `agents-progress:reportar-progresso`: Claude loads it before any delegation to report the plan and each accepted task. It is not in the `/` menu.
 
 Cost is a rough estimate from token counts and the `PRICES` table in `hooks/register.tsx`, not a bill.
+
+The band and the panel draw from the mod's own tools and each run's token counts, not from Claude Code's own progress summaries of subagents. To spare the requests that write those summaries, set `CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES=1` (Claude Code 2.1.318).
 
 ## Settings
 
@@ -46,6 +48,8 @@ claude plugin marketplace add fabiopbarbieri/agents-progress
 claude plugin install agents-progress@agents-progress
 ```
 
+It needs Claude Code 2.1.286 or later: mods run from 2.1.286 in the desktop app and from 2.1.287 in the terminal (`engines` in `.claude-plugin/plugin.json`; Claude Code reads that range from 2.1.323, and older releases ignore it). Features that came later in Claude Code step aside on an older one, as each note above says.
+
 The Claude desktop app has no `/plugin` command: install from a terminal, and the mod loads in the app's local sessions too.
 
 The options are optional: the install may say they are not set, and their defaults apply until you change them in `/config`.
@@ -62,7 +66,9 @@ npx -p typescript@5 tsc -p .
 
 `claude plugin test` runs `tests/*.test.ts` against the engine's own host, on the terminal and desktop surfaces; `tests/kit.ts` stands for the engine beneath the mod. It checks the hooks and the trees they return, not how a surface paints them.
 
-`tsc` reads the API types the engine lays in `.claude-plugin/types/` (ignored by Git) when an interactive session loads the mod from its folder, as `claude --plugin-dir .` does; a `claude -p` run does not lay them. Tests stay out of it, as their fixtures are partial.
+From Claude Code 2.1.323, `validate` type-checks `hooks/` and `tests/` against the engine's own API types, and `--strict` fails on any type error. `tests/kit.ts` builds full render requests (`BAND`, `PANE`) so the tests pass that check. Run it with 2.1.323 or later: an older CLI warns about the `engines` field it does not know, and `--strict` fails on that warning.
+
+`tsc` reads the API types the engine lays in `.claude-plugin/types/` (ignored by Git) when an interactive session loads the mod from its folder, as `claude --plugin-dir .` does; a `claude -p` run does not lay them. It covers `hooks/` and `types/` only.
 
 ## Versioning
 

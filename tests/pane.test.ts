@@ -108,3 +108,32 @@ test("the terminal's ? lists the pane's keys; the desktop draws no ?", async ($,
   expect(await desk.find({ type: 'Button', key: 'help' })).toBeUndefined()
   await desk.unmount()
 })
+
+test("while something covers the prompt, the ? says its keys wait for it; the desktop draws the same", async ($, on) => {
+  mock.clock(on, { now: 1000 })
+  engine(on)
+  await $.agent.spawn(spawn('1') as never)
+  const covered = { ...PANE, props: { ...PANE.props, isPromptCovered: true as const } }
+  const term = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...PANE })
+  await term.press({ key: 'help' })
+  expect(await term.find({ type: 'Text', text: 'With the pane focused (ctrl+x tab):' })).toBeDefined()
+  expect(await term.find({ type: 'Text', text: 'Once the prompt is free, focus the pane (ctrl+x tab):' })).toBeUndefined()
+  await term.unmount()
+
+  // The help stays open in the panel's state; only its first line changes.
+  const under = await $.ui.mount({ plugin: 'agents-progress', surface: 'terminal', ...covered })
+  expect(await under.find({ type: 'Text', text: 'Once the prompt is free, focus the pane (ctrl+x tab):' })).toBeDefined()
+  expect(await under.find({ type: 'Text', text: 'With the pane focused (ctrl+x tab):' })).toBeUndefined()
+  expect(await under.find({ type: 'Text', text: /m main conversation · Esc close/ })).toBeDefined()
+  await under.unmount()
+
+  // The desktop draws no keys, so a covered prompt changes nothing there.
+  const alts = async (props: typeof PANE | typeof covered) => {
+    const desk = await $.ui.mount({ plugin: 'agents-progress', surface: 'desktop', ...props })
+    const drawn = (await desk.findAll({ type: 'Svg' })).map(svg => String(svg.props.alt))
+    expect(await desk.find({ type: 'Text', text: /ctrl\+x tab/ })).toBeUndefined()
+    await desk.unmount()
+    return drawn
+  }
+  expect(await alts(covered)).toEqual(await alts(PANE))
+})

@@ -2,6 +2,21 @@
 
 All notable changes to agents-progress. The project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html); see *Versioning* in the README.
 
+## [Unreleased]
+
+### Added
+
+- `engines` in `plugin.json` states the oldest Claude Code the mod runs on, 2.1.286: mods run from 2.1.286 in the desktop app and from 2.1.287 in the terminal. Claude Code 2.1.323 reads it at install, update and load; older releases, the desktop app's engine included, ignore it, and features that came later still step aside on them as before.
+
+### Changed
+
+- On the terminal, while a dialog or a field above the prompt covers the prompt, the pane's `?` help says to focus the pane with `ctrl+x tab`, a prompt key, once the prompt is free. It needs Claude Code 2.1.323, which tells the pane so; an older engine keeps the usual line. The desktop pane draws no keys and is unchanged.
+
+### Documentation
+
+- The README notes that the band and the panel do not use Claude Code's own subagent progress summaries, so `CLAUDE_CODE_DISABLE_AGENT_PROGRESS_SUMMARIES=1` can spare the requests that write them.
+- `claude plugin validate . --strict` passes on Claude Code 2.1.323, which type-checks the tests: the test kit builds full render requests, and the README's checks say what the type check covers.
+
 ## [1.6.0] - 2026-11-04
 
 ### Changed
